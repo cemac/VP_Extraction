@@ -1,0 +1,13 @@
+name: DRUID
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.8
+  - scipy
+  - netcdf4
+  - matplotlib
+  - statsmodels
+  - numpy
+  - arm_pyart
+  - h5py
