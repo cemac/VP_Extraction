@@ -83,7 +83,7 @@ def parse_args():
     parser.add_argument("-f", "--fields",
                         dest="field_list",
                         default=None,
-                        help='''Comma-separated list of variables to be
+                        help='''Space-separated list of variables to be
                         used in profile extraction''')
 
     parser.add_argument("-z", "--zoom-interval",
@@ -121,7 +121,7 @@ def parse_args():
     # Options for QVP extraction
     qvp_group = parser.add_argument_group('QVP', 'Options for QVP extraction')
 
-    qvp_group.add_argument("--elevation", type=float,
+    qvp_group.add_argument("-l", "--elevation", type=float,
                            help='''Elevation for QVP extraction''')
 
     qvp_group.add_argument("-c", "--count-threshold",
