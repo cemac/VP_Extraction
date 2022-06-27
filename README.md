@@ -1,4 +1,7 @@
 # DRUID
+
+### THIS REPO IS IN BETA STAGE, AND REQUIRES FURTHER TESTING BEFORE USE ON LARGE JOBS
+
 Repo for the Vertical Profile generation code, used in the DRUID, BioDar and PESTdar projects
 
 This repo contains a refactored version of the QVP (quasi-vertical profile) extraction code which has been extended to allow static CVP (column vertical profile) extraction. Code has also been added that allows dynamic CVP extraction, however this code is not yet executable.
