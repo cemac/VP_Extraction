@@ -6,20 +6,13 @@
 QVP_len=$( ./vp_params.py QVP )
 CVP_len=$( ./vp_params.py CVP )
 
-if [ $QVP_len -gt $CVP_len ]; then
-  max_len=$QVP_len
-else
-  max_len=$CVP_len
-fi
-
 function usage {
           echo "" 1>&2;
-          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -l << int >> -m <<CVP|QVP>> [-h] [-v]" 1>&2;
+          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> [-h] [-v]" 1>&2;
           echo "" 1>&2;
           echo "Required Arguments: " 1>&2;
           echo "  -s : start date for vp extraction" 1>&2;
           echo "  -e : end date for vp extraction" 1>&2;
-          echo "  -l : length of site list, minimum 1 maximum $QVP_len in QVP mode, or $CVP_len in CVP mode. List can be editted in VP_Main.py" 1>&2;
           echo "  -m : VP mode, either CVP or QVP (case sensitive)" 1>&2;
           echo "" 1>&2;
           echo "Options: " 1>&2;
@@ -34,10 +27,6 @@ verbose="false"
 
 while getopts ":s:e:l:m:h" flag; do
     case "${flag}" in
-        l)
-            l=${OPTARG}
-            ((l >= 1 && l <=$max_len )) || usage 1 "site list length outside of accepted bounds"
-            ;;
         s)
             s=${OPTARG}
             ;;
@@ -62,14 +51,14 @@ done
 shift $((OPTIND-1))
 
 #Requires all three arguments
-if [ -z "${s}" ] || [ -z "${e}" ] || [ -z "${l}" ] || [ -z "${m}" ]; then
-    usage 1 "-s -e -l and -m arguments are all required"
+if [ -z "${s}" ] || [ -z "${e}" ] || [ -z "${m}" ]; then
+    usage 1 "-s -e and -m arguments are all required"
 fi
 
-if [ ${m} == "CVP" ] &&  [ ${l} -gt $CVP_len ]; then
-    usage 1 "Maximum value of site length in CVP mode is $CVP_len"
-elif [ ${m} == "QVP" ] && [ ${l} -gt $QVP_len ]; then
-    usage 1 "Maximum value of site length in QVP mode is $QVP_len"
+if [ ${m} == "CVP" ]; then
+    site_len=$CVP_len
+elif [ ${m} == "QVP" ]; then
+    site_len=$QVP_len
 fi
 
 date1=$( date -d $s +%s )
@@ -85,7 +74,7 @@ date_len=$(( ($date2 - $date1 )/(60*60*24) + 1 ))
 date1_formatted=$( date -u -d @${date1} +"%Y%m%d" )
 date2_formatted=$( date -u -d @${date2} +"%Y%m%d" )
 
-Max_iter=$(( $date_len*$l ))
+Max_iter=$(( $date_len*$site_len ))
 
 cat > vp_slurm.sb <<-EOF
 #!/bin/bash -l
@@ -95,7 +84,7 @@ cat > vp_slurm.sb <<-EOF
 #SBATCH --array=1-$Max_iter              # Array range
 
 source activate DRUID_VP
-python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $l $verbose
+python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $verbose
 EOF
 
 echo "sbatch vp_slurm.sb"

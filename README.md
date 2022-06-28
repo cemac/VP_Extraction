@@ -14,12 +14,11 @@ Included in this repo is an environment file which can be used for running the p
 
 If running a big extraction job, the script `RunVP.sh` should be used. Usage for this is as follows:
 
-Usage: ./RunVP.sh -s <<YYYYmmdd>> -e <<YYYYmmdd>> -l <<int>> -m <<CVP|QVP>> [-h] [-v]
+Usage: ./RunVP.sh -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> [-h] [-v]
 
 Required Arguments:
   -s : start date for vp extraction
   -e : end date for vp extraction
-  -l : length of site list, minimum 1 maximum of 7 in QVP mode, or 24 in CVP mode. List can be editted in VP_Main.py
   -m : VP mode, either CVP or QVP (case sensitive)
 
 Options:
