@@ -4,19 +4,12 @@
 Routines for Writing Vertical Profiles from UKMO NIMROD Files
 """
 
-vp_script="/gws/smf/j04/ncas_radar/rrniii/BioDAR/VP_Extraction/vp_extraction.py"
-#log output location
-log_output="/gws/smf/j04/ncas_radar/rrniii/BioDAR/VP_Extraction/Output/"
-
-data_input = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/raw_h5_data/single-site/"
-data_output = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/"
-
 from datetime import timedelta
 from dateutil.parser import parse as dateparse
 from os import path, system
 from sys import argv
 from re import sub
-from vp_params import cvp_sites, qvp_sites
+from vp_params import cvp_sites, qvp_sites, data_input, data_output, vp_script, log_output
 
 #function for getting list of dates
 def date_range(start, end):

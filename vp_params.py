@@ -1,6 +1,13 @@
 #! /usr/bin/env python3
 from sys import argv
 
+vp_script="/gws/smf/j04/ncas_radar/rrniii/BioDAR/VP_Extraction/vp_extraction.py"
+#log output location
+log_output="/gws/smf/j04/ncas_radar/rrniii/BioDAR/VP_Extraction/Output/"
+
+data_input = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/raw_h5_data/single-site/"
+data_output = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/"
+
 cvp_sites = {
              0: {'col_pos_name': "rothamsted",            'col_lat' : 51.806908, 'col_long' : -0.3609735, 'radar' : "chenies",       'col_radius' : [2.5, 5, 7.5, 10]},
              1: {'col_pos_name': "rothamsted_fixed_15km", 'col_lat' : 51.78928,  'col_long' : -0.38672,   'radar' : "chenies",       'col_radius' : [2.5, 5, 7.5, 10]},

@@ -26,7 +26,7 @@ Options:
   -h : Show this usage helper
   -v : Run programs in verbose mode
 
-The dictionaries containing the different sites is given in the vp_params.py file, with different dictionaries for cvp and qvp. These dictionaries contain all the parameters for each site. If editting this file, all fields should remain in the dictionary as the VP_Main.py file expects certain keys dependant on the VP mode.
+The dictionaries containing the different sites, and the input/output paths used, are given in the vp_params.py file, with different dictionaries for cvp and qvp. These dictionaries contain all the parameters for each site. If editting this file, all fields should remain in the dictionary as the VP_Main.py file expects certain keys dependant on the VP mode.
 
 If running the program on its own, the program can be invoked with:
 
