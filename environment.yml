@@ -1,4 +1,4 @@
-name: DRUID
+name: DRUID_VP
 channels:
   - conda-forge
   - defaults
