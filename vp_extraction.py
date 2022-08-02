@@ -46,6 +46,11 @@ DEFAULT_COLUMN_LAT = 51.78928
 DEFAULT_COLUMN_LON = -0.38672
 DEFAULT_STATIC_POINT = "Rothamsted"
 
+##### Neely
+DEFAULT_MIN_H = 0
+DEFAULT_MAX_H = 10000
+DEFAULT_H_STEP = 250
+
 def parse_args():
     formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=__doc__,
@@ -96,6 +101,11 @@ def parse_args():
                         action="store_true",
                         help='''Indicate that the source of the data is
                         the Met office radars''')
+    #######Neely
+    parser.add_argument("-k", "--column minimum altitude", dest="min_h", default = DEFAULT_MIN_H, help="Column lowest altitude in m")
+    parser.add_argument("-j", "--column maximum altitude", dest="max_h", default = DEFAULT_H_STEP, help="Column highest altitude in m")
+    parser.add_argument("-u", "--column profile resolution", dest="h_step", default = DEFAULT_H_STEP, help="Column resulting profile resolution in m")
+    #######
 
     # Options for CVP extraction
     cvp_group = parser.add_argument_group('CVP', 'Options for CVP extraction')
@@ -268,12 +278,8 @@ def get_qvp_options(elevation,
 
     return (elevation, count_threshold, azimuth_exclude)
 
-
-def get_cvp_options(avg_range_delta,
-                    lat,
-                    lon,
-                    static_point,
-                    verbose=False):
+###neely
+def get_cvp_options(avg_range_delta,lat,lon,static_point,min_h,max_h,h_step,verbose=False):
     '''
     Get options specific to CVP extraction: average range delta,
     latitude, longitude and static point label.
@@ -284,8 +290,12 @@ def get_cvp_options(avg_range_delta,
     lat = float(lat)
     lon = float(lon)
     static_point = static_point
+    min_h = float(min_h)
+    max_h = float(max_h)
+    h_step = float(h_step)
+    
 
-    return (avg_range_delta, lat, lon, static_point)
+    return (avg_range_delta, lat, lon, static_point,  min_h, max_h,   h_step)
 
 
 def get_input_folder_glob_spec(input_dir,
@@ -453,11 +463,15 @@ def main():
 
     elif profile_type == 'CVP':
         # CVP specific options
-        avg_range_delta, lat, lon, static_point = get_cvp_options(args.avg_range_delta,
-                                                                  args.lat,
-                                                                  args.lon,
-                                                                  args.static_point,
-                                                                  verbose)
+        ##Neely
+        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step  = get_cvp_options(args.avg_range_delta,
+                                                                                         args.lat,
+                                                                                         args.lon,
+                                                                                         args.static_point,
+                                                                                         args.min_h,
+                                                                                         args.max_h,
+                                                                                         args.h_step,
+                                                                                         verbose)
 
         # Filename for the output CVP file
         # e.g. Rothamsted_10km_20170517.nc
@@ -524,7 +538,8 @@ def main():
             avg_range_delta=avg_range_delta,
             met_office=met_office,
             verbose=verbose,
-            vp_mode='cvp_static'
+            vp_mode='cvp_static',
+            min_h = 0, max_h = 10000, h_step = 250
         )
     else:
         raise ValueError("Unrecognised profile type")
