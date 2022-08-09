@@ -283,7 +283,7 @@ def get_qvp_options(elevation,
 
     return (elevation, count_threshold, azimuth_exclude)
 
-###neely
+
 def get_cvp_options(avg_range_delta,
                     lat,
                     lon,
