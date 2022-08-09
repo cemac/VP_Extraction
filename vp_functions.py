@@ -375,7 +375,7 @@ def get_r_indexes(r, steps_in_range_delta, max_range,verbose = True):
     return(r_indxs)
 
 def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_delta,
-	azimuth_exclude = None, min_h = None, max_h = None, h_step = None, verbose=True):
+    azimuth_exclude = None, min_h = None, max_h = None, h_step = None, verbose=True):
 
     [r,az,el] = map(int, cvp_index)
 
