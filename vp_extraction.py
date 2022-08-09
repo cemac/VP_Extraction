@@ -15,7 +15,7 @@ Authors:
  * Adapted by T.D. James <t.d.james1@leeds.ac.uk>, June 2022
 
 :copyright: © 2022 University of Leeds.
-:license: ???
+:license: BSD3
 
 """
 from __future__ import (absolute_import, division, print_function)
@@ -45,8 +45,6 @@ DEFAULT_AVG_RANGE_DELTA = 2.5
 DEFAULT_COLUMN_LAT = 51.78928
 DEFAULT_COLUMN_LON = -0.38672
 DEFAULT_STATIC_POINT = "Rothamsted"
-
-##### Neely
 DEFAULT_MIN_H = 0
 DEFAULT_MAX_H = 10000
 DEFAULT_H_STEP = 250
@@ -101,11 +99,6 @@ def parse_args():
                         action="store_true",
                         help='''Indicate that the source of the data is
                         the Met office radars''')
-    #######Neely
-    parser.add_argument("-k", "--column minimum altitude", dest="min_h", default = DEFAULT_MIN_H, help="Column lowest altitude in m")
-    parser.add_argument("-j", "--column maximum altitude", dest="max_h", default = DEFAULT_H_STEP, help="Column highest altitude in m")
-    parser.add_argument("-u", "--column profile resolution", dest="h_step", default = DEFAULT_H_STEP, help="Column resulting profile resolution in m")
-    #######
 
     # Options for CVP extraction
     cvp_group = parser.add_argument_group('CVP', 'Options for CVP extraction')
@@ -127,6 +120,18 @@ def parse_args():
                            default=DEFAULT_STATIC_POINT,
                            help='''The name of the static position of the column
                            (station or lighting trap) for CVP extraction''')
+
+    cvp_group.add_argument("-k", "--column-minimum-altitude",
+                            dest="min_h", default = DEFAULT_MIN_H,
+                            help="Column lowest altitude in m")
+
+    cvp_group.add_argument("-j", "--column-maximum-altitude",
+                            dest="max_h", default = DEFAULT_H_STEP,
+                            help="Column highest altitude in m")
+
+    cvp_group.add_argument("-u", "--column-profile-resolution",
+                            dest="h_step", default = DEFAULT_H_STEP,
+                            help="Column resulting profile resolution in m")
 
     # Options for QVP extraction
     qvp_group = parser.add_argument_group('QVP', 'Options for QVP extraction')
@@ -279,7 +284,14 @@ def get_qvp_options(elevation,
     return (elevation, count_threshold, azimuth_exclude)
 
 ###neely
-def get_cvp_options(avg_range_delta,lat,lon,static_point,min_h,max_h,h_step,verbose=False):
+def get_cvp_options(avg_range_delta,
+                    lat,
+                    lon,
+                    static_point,
+                    min_h,
+                    max_h,
+                    h_step,
+                    verbose=False):
     '''
     Get options specific to CVP extraction: average range delta,
     latitude, longitude and static point label.
@@ -293,9 +305,9 @@ def get_cvp_options(avg_range_delta,lat,lon,static_point,min_h,max_h,h_step,verb
     min_h = float(min_h)
     max_h = float(max_h)
     h_step = float(h_step)
-    
 
-    return (avg_range_delta, lat, lon, static_point,  min_h, max_h,   h_step)
+
+    return (avg_range_delta, lat, lon, static_point, min_h, max_h, h_step)
 
 
 def get_input_folder_glob_spec(input_dir,
@@ -452,10 +464,11 @@ def main():
 
     if profile_type == 'QVP':
         # QVP specific options
-        elevation, count_threshold, azimuth_exclude = get_qvp_options(args.elevation,
-                                                                      args.count_threshold,
-                                                                      args.azimuth_bounds_to_exclude,
-                                                                      verbose)
+        elevation, count_threshold, azimuth_exclude = \
+            get_qvp_options(args.elevation,
+                            args.count_threshold,
+                            args.azimuth_bounds_to_exclude,
+                            verbose)
 
         # Filename for the output QVP file
         # e.g. 20170517_QVP_20.0deg.nc
@@ -463,15 +476,15 @@ def main():
 
     elif profile_type == 'CVP':
         # CVP specific options
-        ##Neely
-        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step  = get_cvp_options(args.avg_range_delta,
-                                                                                         args.lat,
-                                                                                         args.lon,
-                                                                                         args.static_point,
-                                                                                         args.min_h,
-                                                                                         args.max_h,
-                                                                                         args.h_step,
-                                                                                         verbose)
+        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step  = \
+            get_cvp_options(args.avg_range_delta,
+                            args.lat,
+                            args.lon,
+                            args.static_point,
+                            args.min_h,
+                            args.max_h,
+                            args.h_step,
+                            verbose)
 
         # Filename for the output CVP file
         # e.g. Rothamsted_10km_20170517.nc
@@ -537,9 +550,11 @@ def main():
             cvp_indexes=cvp_indexes,
             avg_range_delta=avg_range_delta,
             met_office=met_office,
+            min_h = min_h,
+            max_h = max_h,
+            h_step = h_step,
             verbose=verbose,
-            vp_mode='cvp_static',
-            min_h = 0, max_h = 10000, h_step = 250
+            vp_mode='cvp_static'
         )
     else:
         raise ValueError("Unrecognised profile type")
