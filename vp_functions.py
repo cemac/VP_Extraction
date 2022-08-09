@@ -636,7 +636,7 @@ def altitude_parameter_averaging_qvp(radar, elevation, field, azimuth_exclude, v
 
             return (altitudes, observation_count, mean_values, std_values, timeofsweep)
 
-###Neely Change time_height_cvp_static
+
 def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta = 5,
                 elevation = None, count_threshold=0,  met_office=False,
                 azimuth_exclude = [], min_h = None, max_h = None, h_step = None,
