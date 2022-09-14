@@ -32,9 +32,9 @@ def field_fill_to_nan(radar, mask_field):
 def static_index_for_csv_file(radar_file, file_list_length, field_list, lat, lon, alt,met_office=False):
 
     # open radar file
-    if(met_office):
-        (radar, unit_dict, long_names, short_names) = read_file(0, '0000', radar_file, field_list,met_office=met_office)
-    else:radar = pyart.io.read(radar_file)
+    #if(met_office):
+    (radar, unit_dict, long_names, short_names) = read_file(0, '0000', radar_file, field_list,met_office=met_office)
+    #else:radar = pyart.io.read(radar_file)
 
     #elevations = radar.elevation['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps)))
     altitudes = radar.fields['scan_altitude']['data']
@@ -665,6 +665,8 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
             cvp_indexes = cvp_indexes * len(list_of_files)
         testfile.close()
     else:
+        if not vp_mode == 'qvp':
+            cvp_indexes = np.tile(cvp_indexes,(len(list_of_files),1))
         times = [defaulttime]
 
 

@@ -47,7 +47,7 @@ DEFAULT_COLUMN_LON = -0.38672
 DEFAULT_STATIC_POINT = "Rothamsted"
 DEFAULT_MIN_H = 0
 DEFAULT_MAX_H = 10000
-DEFAULT_H_STEP = 250
+DEFAULT_H_STEP = 50
 
 def parse_args():
     formatter = argparse.RawDescriptionHelpFormatter
@@ -126,7 +126,7 @@ def parse_args():
                             help="Column lowest altitude in m")
 
     cvp_group.add_argument("-j", "--column-maximum-altitude",
-                            dest="max_h", default = DEFAULT_H_STEP,
+                            dest="max_h", default = DEFAULT_MAX_H,
                             help="Column highest altitude in m")
 
     cvp_group.add_argument("-u", "--column-profile-resolution",
