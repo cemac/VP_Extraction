@@ -9,57 +9,52 @@ from netCDF4 import num2date
 import kdp_functions as kdpfun
 import math
 import datetime as dt
-#from scipy.optimize import curve_fit
-#import numpy.ma as ma
-#from statsmodels.nonparametric.kernel_regression import KernelReg
-#from scipy.signal import savgol_filter
 from scipy import stats
 
 from vp_io import read_file
 
 def field_fill_to_nan(radar, mask_field):
 
-	if mask_field in radar.fields.keys():
-		try:
-			if(np.ma.is_masked(radar.fields[mask_field]['data'])):
-				mask = radar.fields[mask_field]['data'].mask
-				radar.fields[mask_field]['data'] = radar.fields[mask_field]['data'].data
-				radar.fields[mask_field]['data'][mask==True] = np.nan
-		except:
-			print('''field_fill_to_nan doesn't work, try again''')
-			raise
-	else:
-		print ("{} is not in radar.fields.keys() {}".format(mask_field,radar.fields.keys()))
-	return
+    if mask_field in radar.fields.keys():
+        try:
+            if(np.ma.is_masked(radar.fields[mask_field]['data'])):
+                mask = radar.fields[mask_field]['data'].mask
+                radar.fields[mask_field]['data'] = radar.fields[mask_field]['data'].data
+                radar.fields[mask_field]['data'][mask==True] = np.nan
+        except:
+            print('''field_fill_to_nan doesn't work, try again''')
+            raise
+    else:
+        print ("{} is not in radar.fields.keys() {}".format(mask_field,radar.fields.keys()))
+    return
 
 
 def static_index_for_csv_file(radar_file, file_list_length, field_list, lat, lon, alt,met_office=False):
-	 #print "in static_index_for_csv_file ({},{},{})".format(lat, lon, alt)
-	 # open radar file
-	 if(met_office):
-		 (radar, unit_dict, long_names, short_names) = read_file(0, '0000', radar_file, field_list,met_office=met_office)#read_nimrod_aggregated_odim_h5(radar_file,'lp', '0000')
-		 #radar = named_fields(radar)
-	 else:radar = pyart.io.read(radar_file)
 
-	 #elevations = radar.elevation['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps)))
-	 altitudes = radar.fields['scan_altitude']['data']
-	 altitudes = altitudes.reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
+    # open radar file
+    #if(met_office):
+    (radar, unit_dict, long_names, short_names) = read_file(0, '0000', radar_file, field_list,met_office=met_office)
+    #else:radar = pyart.io.read(radar_file)
 
-	 lat_data = radar.gate_latitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
-	 lon_data = radar.gate_longitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
-	 #alt_data = radar.gate_altitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
+    #elevations = radar.elevation['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps)))
+    altitudes = radar.fields['scan_altitude']['data']
+    altitudes = altitudes.reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
 
-	 #in_lat = (np.abs(lat_data[0,:,:] - lat)).argmin()
-	 #in_lon = (np.abs(lon_data[0,:,:] - lon)).argmin()
-	 X = np.sqrt( np.square( lat_data[0,:,:] - lat ) +  np.square( lon_data[0,:,:] - lon ) )
-	 idx = np.where( X == X.min() )
+    lat_data = radar.gate_latitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
+    lon_data = radar.gate_longitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
+    #alt_data = radar.gate_altitude['data'].reshape((radar.nsweeps,int(radar.nrays/radar.nsweeps),radar.ngates))
 
-	 in_bin_range = idx[1]
-	 in_bin_azimuth = idx[0]
+    #in_lat = (np.abs(lat_data[0,:,:] - lat)).argmin()
+    #in_lon = (np.abs(lon_data[0,:,:] - lon)).argmin()
+    X = np.sqrt( np.square( lat_data[0,:,:] - lat ) +  np.square( lon_data[0,:,:] - lon ) )
+    idx = np.where( X == X.min() )
 
-	 index_list = np.array(list(zip(in_bin_range, in_bin_azimuth, [0]))).tolist()
+    in_bin_range = idx[1]
+    in_bin_azimuth = idx[0]
 
-	 return index_list
+    index_list = np.array(list(zip(in_bin_range, in_bin_azimuth, [0]))).tolist()
+
+    return index_list
 
 
 def savitzky_golay(y, window_size, order, deriv=0, rate=1):
@@ -139,9 +134,7 @@ def smooth(x,window_len=11,window='hanning'):
     """smooth the data using a window with requested size.
 
     This method is based on the convolution of a scaled window with the signal.
-    The signal is prepared by introducing reflected copies of the signal
-    (with the window size) in both ends so that transient parts are minimized
-    in the begining and end part of the output signal.
+
 
     input:
         x: the input signal
@@ -168,27 +161,20 @@ def smooth(x,window_len=11,window='hanning'):
     """
 
     if x.ndim != 1:
-        raise (ValueError, "smooth only accepts 1 dimension arrays.")
+        raise ValueError("smooth only accepts 1 dimension arrays.")
 
     if x.size < window_len:
-        raise (ValueError, "Input vector needs to be bigger than window size.")
-
+        raise ValueError("Input vector needs to be bigger than window size.")
 
     if window_len<3:
         return x
 
-
     if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise (ValueError, "Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
 
-
-    s=np.r_[x[window_len-1:0:-1],x,x[-2:-window_len-1:-1]]
-    if window == 'flat': #mDLI200513132229.RAWZK42oving average
-        w=np.ones(window_len,'d')
-    else:
-        w=eval('np.'+window+'(window_len)')
-
-    y=np.convolve(w/w.sum(),s,mode='valid')
+    box = np.ones(window_len)/window_len
+    y = np.convolve(x, box, mode='same')
+    y[0] = x[0]# to remove jumps at the lowest elevation
     return y
 
 
@@ -370,26 +356,26 @@ def get_az_indexes(az,avg_az_delta, verbose = True):
 
 def get_r_indexes(r, steps_in_range_delta, max_range,verbose = True):
 
-	if (verbose):
-		print ("in get_az_indexes(r = {},steps_in_range_delta = {})".format(r, steps_in_range_delta))
+    if (verbose):
+        print ("in get_az_indexes(r = {},steps_in_range_delta = {})".format(r, steps_in_range_delta))
 
-	if(r+steps_in_range_delta>max_range):
-		from_r = range(r-steps_in_range_delta-1,r)
-		to_r =  range(r,max_range)
-	elif(r-steps_in_range_delta<0):
-		from_r = range(0,r)
-		to_r = range(r,r+steps_in_range_delta)
-	else:
-		from_r = range(r-steps_in_range_delta,r)
-		to_r = range(r,r+steps_in_range_delta+1)
+    if(r+steps_in_range_delta>max_range):
+        from_r = range(r-steps_in_range_delta-1,r)
+        to_r =  range(r,max_range)
+    elif(r-steps_in_range_delta<0):
+        from_r = range(0,r)
+        to_r = range(r,r+steps_in_range_delta)
+    else:
+        from_r = range(r-steps_in_range_delta,r)
+        to_r = range(r,r+steps_in_range_delta+1)
 
-	r_indxs = []
-	r_indxs.extend(from_r)
-	r_indxs.extend(to_r)
-	return(r_indxs)
+    r_indxs = []
+    r_indxs.extend(from_r)
+    r_indxs.extend(to_r)
+    return(r_indxs)
 
-
-def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_delta, azimuth_exclude = None, verbose=True):
+def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_delta,
+    azimuth_exclude = None, min_h = None, max_h = None, h_step = None, verbose=True):
 
     [r,az,el] = map(int, cvp_index)
 
@@ -457,19 +443,31 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
     # get altitudes for the column values
     column_altitudes = altitudes[np.ix_(range(0,radar.nsweeps),az_indxs,r_indxs)] #13.12.2021 test
     #column_altitudes = altitudes[np.ix_(range(0,100),az_indxs,r_indxs)]
+    #get the voxel size for the altitude levels
+
+    base = 5 # precision
+
+    if h_step is None: h_step = int(1000 * round(((az_size)/1000)))
+
+    if min_h is None: min_h = int(1000 * base * round((np.nanmin(altitudes)/1000)/base))
+
+    if max_h is None: max_h = int(1000 * base * round((np.nanmax(altitudes)/1000)/base))
+
+    equidistant_alt = np.linspace((min_h + h_step/2), (max_h - h_step/2), num=int(max_h/h_step))
+    equidistant_bound = np.linspace((min_h), (max_h), num=int(max_h/h_step)+1)
 
     if verbose:
-	    print ("!!!! column_altitudes.shape")
-	    print (column_altitudes.shape)
-	    print ("np.unique(column_altitudes)")
-	    print (len(np.unique(column_altitudes)))
+        print ("!!!! column_altitudes.shape")
+        print (column_altitudes.shape)
+        print ("np.unique(column_altitudes)")
+        print (len(np.unique(column_altitudes)))
     # calculate mean altitudes for each range of the selected column
     altitudes_to_smooth = np.nanmean(column_altitudes,axis=1)
     if verbose:
-	    print ("altitudes_to_smooth")
-	    print (altitudes_to_smooth.shape)
-	    print ("np.nanmean(altitudes_to_smooth,axis=1)")
-	    print (np.nanmean(altitudes_to_smooth,axis=1).shape)
+        print ("altitudes_to_smooth")
+        print (altitudes_to_smooth.shape)
+        print ("np.nanmean(altitudes_to_smooth,axis=1)")
+        print (np.nanmean(altitudes_to_smooth,axis=1).shape)
 
     # flattened altitude values array
     flat_altitudes = altitudes_to_smooth.flatten().reshape((np.prod(altitudes_to_smooth.shape),1))
@@ -477,9 +475,9 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
 
     if mask_field in ['dBuZ', 'dBZ', 'dBZ_ac', 'dBuZv', 'dBZv']:column = np.power(10, column / 10.0)
 
-	# unfold uPhiDP values
-	# remove phi_dp wrap-around:
-	#print 'unwrapping phidp ...'
+    # unfold uPhiDP values
+    # remove phi_dp wrap-around:
+    #print 'unwrapping phidp ...'
     if mask_field in ['uPhiDP']:
         elev = column.shape[0]
         rays = column.shape[1]
@@ -493,65 +491,37 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
         (meteoMask) = kdpfun.generate_meteo_mask(elev, rays, bins, flags, rhohv, METEO_THRESH)
         column = kdpfun.unwrap_phidp(elev, rays, bins, meteoMask, column)
 
-    if verbose:
-        print ("column.shape is {}".format(column.shape) )
-    #summed = np.zeros(column.shape)
-    counted = np.zeros(column.shape)
-    mask = np.ma.masked_invalid(column).mask
-    inv_mask = np.where(mask, 0, 1)
-    #summed = np.nansum(column, axis=1)
-    counted = np.nansum(inv_mask, axis=1)
-    observation_count = np.where(counted == 0, np.nan, counted)
-    mean_values = np.nanmean(column, axis=1)
-    std_values = np.nanstd(column, axis=1)
+    # get mean of means for equidistant
+    equdist_mean = np.zeros(equidistant_alt.shape[0])*np.nan
+    equdist_std = np.zeros(equidistant_alt.shape[0])*np.nan
+    equdist_count = np.zeros(equidistant_alt.shape[0])*np.nan
+    equdist_total = np.zeros(equidistant_alt.shape[0])*np.nan
+
+    for item, boundary  in enumerate(equidistant_bound[0:-1]):
+
+        if(item == len(equidistant_bound)-1):bin_indexes = np.where(column_altitudes>=boundary)
+        else:bin_indexes = np.where((column_altitudes>=boundary) & (column_altitudes<equidistant_bound[item+1]))
+
+        equdist_mean[item] = np.nanmean(column[bin_indexes])
+        equdist_std[item] = np.nanstd(column[bin_indexes])
+        equdist_count[item] = len(np.isfinite(column[bin_indexes]))
+        equdist_total[item] = len(column[bin_indexes])
+
+    if len(equidistant_alt) >= 300: win = 5
+    else:win = 3
+
+    smoothed_alt_level_mean = smooth(equdist_mean,win)
 
     if mask_field in ['dBuZ', 'dBZ', 'dBZ_ac', 'dBuZv', 'dBZv']:
-        mean_values = 10 * np.log10(mean_values)
-        std_values = 10 * np.log10(std_values)
-
-    # flattened mean array
-    flat_means = mean_values.flatten().reshape((np.prod(mean_values.shape),1))
-
-    # flattened std array
-    flat_std = std_values.flatten().reshape((np.prod(std_values.shape),1))
-    flat_count = observation_count.flatten().reshape((np.prod(observation_count.shape),1))
-    output_2D_array = []
-    output_2D_array = np.append(flat_altitudes, flat_means, axis=1)
-    output_2D_array = np.append(output_2D_array, flat_std, axis=1)
-    output_2D_array = np.append(output_2D_array, flat_count, axis=1)
-
-    sorted_by_altitude_output_array = output_2D_array[output_2D_array[:,0].argsort()]
-    tmp_array = sorted_by_altitude_output_array
-
-    masked_sorted_by_altitude_output_array = sorted_by_altitude_output_array[~np.isnan(sorted_by_altitude_output_array).any(axis=1)]
-    masked_sorted_by_altitude_output_array = masked_sorted_by_altitude_output_array[~np.isinf(masked_sorted_by_altitude_output_array).any(axis=1)]
-
-    if(len(masked_sorted_by_altitude_output_array)>0):
-        #x = np.linspace(np.min(masked_sorted_by_altitude_output_array[:,0]),np.max(masked_sorted_by_altitude_output_array[:,0]),10000)
-        bin_means, bin_edges, binnumber = stats.binned_statistic(masked_sorted_by_altitude_output_array[:,0],masked_sorted_by_altitude_output_array[:,1], statistic='mean', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,5000,num=51))
-        bin_std, bin_edges, binnumber = stats.binned_statistic(masked_sorted_by_altitude_output_array[:,0],masked_sorted_by_altitude_output_array[:,1], statistic='std', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,10000,num=101))
-        bin_count, bin_edges, binnumber = stats.binned_statistic(masked_sorted_by_altitude_output_array[:,0],masked_sorted_by_altitude_output_array[:,1], statistic='count', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,10000,num=101))
-        bin_width = (bin_edges[1] - bin_edges[0])
-        bin_centers = bin_edges[1:] - bin_width/2
-        #win=5
-        #smoothed_mean = smooth(bin_means,win)
-
-    else:
-        bin_means, bin_edges, binnumber = stats.binned_statistic(tmp_array[:,0],tmp_array[:,1], statistic='mean', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,5000,num=51))
-        bin_std, bin_edges, binnumber = stats.binned_statistic(tmp_array[:,0],tmp_array[:,1], statistic='std', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,10000,num=101))
-        bin_count, bin_edges, binnumber = stats.binned_statistic(tmp_array[:,0],tmp_array[:,1], statistic='count', bins=np.linspace(0,10000,num=101))#bins=np.linspace(0,10000,num=101))
-        bin_width = (bin_edges[1] - bin_edges[0])
-        bin_centers = bin_edges[1:] - bin_width/2
-        bin_means = bin_means * np.nan
-        bin_std = bin_std * np.nan
+        equdist_mean = 10 * np.log10(equdist_mean)
+        equdist_std = 10 * np.log10(equdist_std)
 
     timeofsweep = num2date(np.nanmean(radar.time['data'][:]),
                                        radar.time['units'],
                                        radar.time['calendar'])
 
-    zero_array = np.zeros((column.shape[1],))
-    zero_array[:] = np.nan
-    return bin_centers, bin_count, bin_means, bin_std, timeofsweep
+    return equidistant_alt, equdist_count, smoothed_alt_level_mean, equdist_std, timeofsweep
+    #return bin_centers, bin_count, bin_means, bin_std, timeofsweep
 
 
 def add_dim(arr, arr_name, verbose=False):
@@ -667,7 +637,10 @@ def altitude_parameter_averaging_qvp(radar, elevation, field, azimuth_exclude, v
             return (altitudes, observation_count, mean_values, std_values, timeofsweep)
 
 
-def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta = 5, elevation = None, count_threshold=0,  met_office=False, azimuth_exclude = [], verbose=False, vp_mode='qvp'):
+def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta = 5,
+                elevation = None, count_threshold=0,  met_office=False,
+                azimuth_exclude = [], min_h = None, max_h = None, h_step = None,
+                verbose=False, vp_mode='qvp'):
 
     import itertools
 
@@ -692,6 +665,8 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
             cvp_indexes = cvp_indexes * len(list_of_files)
         testfile.close()
     else:
+        if not vp_mode == 'qvp':
+            cvp_indexes = np.tile(cvp_indexes,(len(list_of_files),1))
         times = [defaulttime]
 
 
@@ -702,7 +677,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
             print ("for loop file is {}".format(file_))
 
         if not vp_mode == 'qvp':
-        	cvp_index = cvp_indexes[f]
+            cvp_index = cvp_indexes[f]
 
 
         # Edited function call so that different call not needed for metoffice=True
@@ -725,7 +700,8 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                     (alts, counts, means, standard_deviations, timeofsweep) = \
                         altitude_parameter_averaging_cvp_static(radar, field,
                             cvp_index, avg_range_delta,
-                            azimuth_exclude = azimuth_exclude, verbose=verbose)
+                            azimuth_exclude = azimuth_exclude, min_h=min_h,
+                            max_h=max_h, h_step=h_step, verbose=verbose)
                 elif vp_mode == 'cvp_dynamic':
                     (alts, counts, means, standard_deviations, timeofsweep) = \
                         altitude_parameter_averaging_cvp(radar, field,
