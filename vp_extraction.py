@@ -46,8 +46,8 @@ DEFAULT_COLUMN_LAT = 51.78928
 DEFAULT_COLUMN_LON = -0.38672
 DEFAULT_STATIC_POINT = "Rothamsted"
 DEFAULT_MIN_H = 0
-DEFAULT_MAX_H = 10000
-DEFAULT_H_STEP = 50
+DEFAULT_MAX_H = 2000
+DEFAULT_H_STEP = 200
 
 def parse_args():
     formatter = argparse.RawDescriptionHelpFormatter

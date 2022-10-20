@@ -70,19 +70,19 @@ if  [ $date2 -lt $date1 ]; then
   date1=$( date -d $e +%s )
 fi
 
-date_len=$(( ($date2 - $date1 )/(60*60*24) + 1 ))
-date1_formatted=$( date -u -d @${date1} +"%Y%m%d" )
-date2_formatted=$( date -u -d @${date2} +"%Y%m%d" )
+date_len=$(( ($date2 - $date1 )/(60*60*24)+1))
+date1_formatted=$( date -u -d @${date1} +'%Y%m%d')
+date2_formatted=$( date -u -d @${date2} +'%Y%m%d')
 
 Max_iter=$(( $date_len*$site_len ))
-
+mkdir -p Output
 cat > vp_slurm.sb <<-EOF
 #!/bin/bash -l
 #SBATCH --job-name=${m}_job_array    # Job name
 #SBATCH --time=12:00:00             # Time limit per array task hrs:min:sec
-#SBATCH --output=%j-%A_%a.out       # Standard output and error log
-#SBATCH --array=1-$Max_iter              # Array range
+#SBATCH --output=Output/%j-%A_%a.out       # Standard output and error log
 
+#SBATCH --array=1-$Max_iter              # Array range
 source activate DRUID_VP
 python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $verbose
 EOF
