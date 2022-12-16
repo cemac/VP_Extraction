@@ -502,9 +502,10 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
         if(item == len(equidistant_bound)-1):bin_indexes = np.where(column_altitudes>=boundary)
         else:bin_indexes = np.where((column_altitudes>=boundary) & (column_altitudes<equidistant_bound[item+1]))
 
-        equdist_mean[item] = np.nanmean(column[bin_indexes])
-        equdist_std[item] = np.nanstd(column[bin_indexes])
-        equdist_count[item] = len(np.isfinite(column[bin_indexes]))
+        temp_column = column[bin_indexes]
+        equdist_mean[item] = np.mean(temp_column[np.where(np.isfinite(column[bin_indexes]))])
+        equdist_std[item] = np.std(temp_column[np.where(np.isfinite(column[bin_indexes]))])
+        equdist_count[item] = len(np.where(np.isfinite(column[bin_indexes])==True)[0])
         equdist_total[item] = len(column[bin_indexes])
 
     if len(equidistant_alt) >= 300: win = 5
