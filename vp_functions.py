@@ -511,7 +511,7 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
     if len(equidistant_alt) >= 300: win = 5
     else:win = 3
 
-    smoothed_alt_level_mean = smooth(equdist_mean,win)
+    equdist_mean = smooth(equdist_mean,win)
 
     if mask_field in ['dBuZ', 'dBZ', 'dBZ_ac', 'dBuZv', 'dBZv']:
         equdist_mean = 10 * np.log10(equdist_mean)
@@ -521,7 +521,7 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
                                        radar.time['units'],
                                        radar.time['calendar'])
 
-    return equidistant_alt, equdist_count, smoothed_alt_level_mean, equdist_std, timeofsweep
+    return equidistant_alt, equdist_count, equdist_mean, equdist_std, timeofsweep
     #return bin_centers, bin_count, bin_means, bin_std, timeofsweep
 
 
