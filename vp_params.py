@@ -9,9 +9,7 @@ log_output="/gws/smf/j04/ncas_radar/rrniii/BioDAR/VP_Extraction/Output/"
 data_input = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/raw_h5_data/single-site/"
 data_output = "/gws/smf/j07/ncas_radar/data/ukmo-nimrod/"
 
-cvp_params = pd.read_excel('/home/users/earmlu/code/VP_Extraction/Parameters_CVP.xlsx', index_col=0)
-cvp_params['col_radius'] = cvp_params['col_radius'].apply(lambda x: x if isinstance(x, list) else [x])
-cvp_sites = cvp_params.to_dict(orient='index')
+cvp_params_file = "./Parameters_CVP.xlsx"
 
 # cvp_sites = {
              # 0: {'col_pos_name': "rothamsted",            'col_lat' : 51.806908, 'col_long' : -0.3609735, 'radar' : "chenies",       'col_radius' : [1, 1.5, 2.0, 2.5, 3.0, 3.5, 4.5, 5.0, 5.5, 6.0, 6.5, 7.0, 7.5, 8.0, 8.5, 9.0, 9.5, 10.0]},
@@ -51,10 +49,31 @@ qvp_sites = {
         }
 # Azimuths to exclude should be put in in the format start1,end1;start2,end2;start3,end3....
 
+
+def read_params(mode, path=None):
+    if mode == "CVP":
+        if path is None:
+            path = cvp_params_file
+        params = pd.read_excel(path, index_col=0)
+        params['col_radius'] = params['col_radius'].apply(lambda x: x if isinstance(x, list) else [x])
+        return params.to_dict(orient='index')
+    elif mode == "QVP":
+        return qvp_sites
+    else:
+        raise ValueError('VP mode not recognised')
+
+
 def main():
-    mode = argv[1]
+    try:
+        args = argv[1:]
+    except IndexError:
+        raise SystemExit(f"Usage: {argv[0]} <mode> [<param_file>]")
+
+    mode = args[0]
+    fp = args[1] if len(args) > 1 else None
 
     if mode == 'CVP':
+        cvp_sites = read_params(mode, fp)
         print (len(cvp_sites))
     elif mode == 'QVP':
         print (len(qvp_sites))

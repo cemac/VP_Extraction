@@ -12,9 +12,10 @@ Included in this repo is an environment file which can be used for running the p
 
 ## Usage
 
-If running a big extraction job, the script `RunVP.sh` should be used. Usage for this is as follows:
+If running a big extraction job, the script `RunVP.sh` should be used to create a batch script. Usage for this script is as follows:
 
-Usage: ./RunVP.sh -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> [-h] [-v]
+```
+Usage: ./RunVP.sh -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> [-f <<file>>] [-h] [-v]
 
 Required Arguments:
   -s : start date for vp extraction
@@ -22,10 +23,18 @@ Required Arguments:
   -m : VP mode, either CVP or QVP (case sensitive)
 
 Options:
+  -f : Path to parameters file (optional, currently only used for CVP extraction)
   -h : Show this usage helper
   -v : Run programs in verbose mode
+```
 
-The dictionaries containing the different sites, and the input/output paths used, are given in the vp_params.py file, with different dictionaries for cvp and qvp. These dictionaries contain all the parameters for each site. If editting this file, all fields should remain in the dictionary as the VP_Main.py file expects certain keys dependant on the VP mode.
+Parameters specifying each site for VP extraction are given in the
+`vp_params.py` module, either directly as a dictionary in the case of
+QVP, or via an external parameters file in the case of CVP. Parameters
+for CVP and QVP differ and all fields for the chosen VP mode must be
+specified as the `VP_Main.py` file expects certain fields dependent on
+the VP mode. Other local parameters such as paths to input/output data
+are also specified in `vp_params.py`.
 
 If running the program on its own, the program can be invoked with:
 

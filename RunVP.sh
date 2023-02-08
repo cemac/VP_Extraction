@@ -1,14 +1,8 @@
 #! /bin/bash -l
 
-#Change this parameter if the length of the site list in VP_Main.py changes.
-#Current values are: in QVP mode - 7; in CVP mode - 24
-
-QVP_len=$( ./vp_params.py QVP )
-CVP_len=$( ./vp_params.py CVP )
-
 function usage {
           echo "" 1>&2;
-          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> [-h] [-v]" 1>&2;
+          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -f <<file>> [-h] [-v]" 1>&2;
           echo "" 1>&2;
           echo "Required Arguments: " 1>&2;
           echo "  -s : start date for vp extraction" 1>&2;
@@ -16,6 +10,7 @@ function usage {
           echo "  -m : VP mode, either CVP or QVP (case sensitive)" 1>&2;
           echo "" 1>&2;
           echo "Options: " 1>&2;
+          echo "  -f : Path to parameters file (optional, currently only used for CVP extraction)" 1>&2;
           echo "  -h : Show this usage helper" 1>&2;
           echo "  -v : Run programs in verbose mode" 1>&2;
           echo "" 1>&2;
@@ -25,7 +20,7 @@ function usage {
 
 verbose="false"
 
-while getopts ":s:e:l:m:h" flag; do
+while getopts ":s:e:l:m:f:h" flag; do
     case "${flag}" in
         s)
             s=${OPTARG}
@@ -36,6 +31,9 @@ while getopts ":s:e:l:m:h" flag; do
         m)
             m=${OPTARG}
             ((m == 'CVP' || m == 'QVP')) || usage 1 "VP mode must be either QVP or CVP"
+            ;;
+        f)
+            f=${OPTARG}
             ;;
         h)
             usage 0 ""
@@ -55,10 +53,10 @@ if [ -z "${s}" ] || [ -z "${e}" ] || [ -z "${m}" ]; then
     usage 1 "-s -e and -m arguments are all required"
 fi
 
-if [ ${m} == "CVP" ]; then
-    site_len=$CVP_len
-elif [ ${m} == "QVP" ]; then
-    site_len=$QVP_len
+#Get site length for specified mode and params file
+site_len=$( ./vp_params.py ${m} ${f} )
+if [ $? != 0 ]; then
+    exit
 fi
 
 date1=$( date -d $s +%s )
@@ -84,7 +82,7 @@ cat > vp_slurm.sb <<-EOF
 
 #SBATCH --array=1-$Max_iter              # Array range
 source activate DRUID_VP
-python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $verbose
+python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $f $verbose
 EOF
 
 echo "sbatch vp_slurm.sb"
