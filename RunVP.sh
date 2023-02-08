@@ -5,8 +5,8 @@ function usage {
           echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -f <<file>> [-h] [-v]" 1>&2;
           echo "" 1>&2;
           echo "Required Arguments: " 1>&2;
-          echo "  -s : start date for vp extraction" 1>&2;
-          echo "  -e : end date for vp extraction" 1>&2;
+          echo "  -s : Start date for VP extraction" 1>&2;
+          echo "  -e : End date for VP extraction" 1>&2;
           echo "  -m : VP mode, either CVP or QVP (case sensitive)" 1>&2;
           echo "" 1>&2;
           echo "Options: " 1>&2;
@@ -85,4 +85,6 @@ source activate DRUID_VP
 python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $f $verbose
 EOF
 
+echo "Created batch script for ${m} job, ${date1_formatted}-${date2_formatted}, ${site_len} sites."
+echo "Run this batch with:"
 echo "sbatch vp_slurm.sb"
