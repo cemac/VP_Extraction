@@ -10,12 +10,11 @@ message: >-
   column vertical products.
 type: software
 authors:
-  - given-names: David
+  - given-names: David R L
     family-names: Dufton
     email: david.dufton@ncas.ac.uk
     affiliation: NCAS
     orcid: 'https://orcid.org/0000-0001-8722-8320'
-    name-particle: R L
   - given-names: Maryna
     family-names: Lukach
     email: maryna.lukach@ncas.ac.uk
@@ -25,8 +24,7 @@ authors:
     family-names: Symonds
     affiliation: CEMAC
     orcid: 'https://orcid.org/0000-0002-8509-4477'
-  - given-names: Tamora
-    name-particle: D
+  - given-names: Tamora D
     family-names: James
     email: t.d.james1@leeds.ac.uk
     affiliation: CEMAC
