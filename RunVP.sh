@@ -1,5 +1,5 @@
 #! /bin/bash -l
-
+conda activate DRUID_VP
 function usage {
           echo "" 1>&2;
           echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -f <<file>> [-h] [-v]" 1>&2;
@@ -54,7 +54,8 @@ if [ -z "${s}" ] || [ -z "${e}" ] || [ -z "${m}" ]; then
 fi
 
 #Get site length for specified mode and params file
-site_len=$( ./vp_params.py ${m} ${f} )
+site_len=$( ./vp_params.py "${m}" "${f}" )
+
 if [ $? != 0 ]; then
     exit
 fi
