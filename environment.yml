@@ -11,3 +11,4 @@ dependencies:
   - numpy
   - arm_pyart
   - h5py
+  - openpyxl
