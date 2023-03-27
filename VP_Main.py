@@ -9,7 +9,7 @@ from dateutil.parser import parse as dateparse
 from os import path, system
 from sys import argv
 from re import sub
-from vp_params import cvp_sites, qvp_sites, data_input, data_output, vp_script, log_output
+from vp_params import read_params, data_input, data_output, vp_script, log_output
 
 #function for getting list of dates
 def date_range(start, end):
@@ -24,21 +24,17 @@ index = int(argv[2])
 start_date = dateparse(argv[3])
 end_date = dateparse(argv[4])
 site_len = int(argv[5])
-verbose = (argv[6].lower() == 'true')
+param_file = argv[6] if len(argv) > 7 else None
+verbose = (argv[-1].lower() == 'true')
 
-if mode == 'CVP':
-    sites = cvp_sites
-    data_output = path.join(data_output,"raw_cvp_data")
-elif mode == 'QVP':
-    sites = qvp_sites
-    data_output = path.join(data_output,"raw_qvp_data")
+if mode == 'CVP' or mode == 'QVP':
+    data_output = path.join(data_output, "raw_{}_data".format(mode.lower()))
 else:
-    print ('VP mode not recognised. Exitting')
-    raise
+    raise ValueError('VP mode not recognised')
 
+sites = read_params(mode, param_file)
 if site_len > len(sites):
-    print ("Expected number of sites is greater than size of site dictonary")
-    raise
+    raise ValueError("Expected number of sites is greater than size of site dictonary")
 
 [start_list, end_list] = date_range(start_date, end_date)
 
