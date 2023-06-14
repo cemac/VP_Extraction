@@ -496,6 +496,7 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
     equdist_std = np.zeros(equidistant_alt.shape[0])*np.nan
     equdist_count = np.zeros(equidistant_alt.shape[0])*np.nan
     equdist_total = np.zeros(equidistant_alt.shape[0])*np.nan
+    equdist_indexes = [None]*equidistant_alt.shape[0]
 
     for item, boundary  in enumerate(equidistant_bound[0:-1]):
 
@@ -503,10 +504,14 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
         else:bin_indexes = np.where((column_altitudes>=boundary) & (column_altitudes<equidistant_bound[item+1]))
 
         temp_column = column[bin_indexes]
-        equdist_mean[item] = np.mean(temp_column[np.where(np.isfinite(column[bin_indexes]))])
-        equdist_std[item] = np.std(temp_column[np.where(np.isfinite(column[bin_indexes]))])
-        equdist_count[item] = len(np.where(np.isfinite(column[bin_indexes])==True)[0])
-        equdist_total[item] = len(column[bin_indexes])
+        valid_indexes = np.where(np.isfinite(temp_column))[0]
+        equdist_mean[item] = np.mean(temp_column[valid_indexes])
+        equdist_std[item] = np.std(temp_column[valid_indexes])
+        equdist_count[item] = len(valid_indexes)
+        equdist_total[item] = len(temp_column)
+        # Store indexes that are included in generating means
+        temp_indexes = np.stack(bin_indexes)[:, valid_indexes]
+        equdist_indexes[item] = tuple(temp_indexes)
 
     if len(equidistant_alt) >= 300: win = 5
     else:win = 3
@@ -521,7 +526,7 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
                                        radar.time['units'],
                                        radar.time['calendar'])
 
-    return equidistant_alt, equdist_count, equdist_mean, equdist_std, timeofsweep
+    return equidistant_alt, equdist_count, equdist_mean, equdist_std, timeofsweep, equdist_indexes
     #return bin_centers, bin_count, bin_means, bin_std, timeofsweep
 
 
@@ -651,6 +656,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
     result_dict = {}
     stddev_dict = {}
     count_dict = {}
+    indexes_dict = {}
     sweep_times = []
     empty_array = {}
     unit_dict = []
@@ -689,7 +695,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
         sweep_time = []
 
         for field in field_list:
-
+            indexes = []
             try:
                 if vp_mode == 'qvp':
                     (alts, counts, means, standard_deviations, timeofsweep) = \
@@ -698,7 +704,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                             meteo=False, METEO_THRESH=0.7)
                 elif vp_mode == 'cvp_static':
                     [r,az,el] = map(int, cvp_index)
-                    (alts, counts, means, standard_deviations, timeofsweep) = \
+                    (alts, counts, means, standard_deviations, timeofsweep, indexes) = \
                         altitude_parameter_averaging_cvp_static(radar, field,
                             cvp_index, avg_range_delta,
                             azimuth_exclude = azimuth_exclude, min_h=min_h,
@@ -720,19 +726,23 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                     empty_array = result_dict[field]
                     stddev_array = stddev_dict[field]
                     counts_array = count_dict[field]
+                    indexes_list = indexes_dict[field]
                     counts = np.zeros(counts_array.shape[0])
                     means = np.zeros(counts_array.shape[0])
                     standard_deviations = np.zeros(counts_array.shape[0])
                     counts[:] = np.nan
                     means[:] = np.nan
                     standard_deviations[:] = np.nan
+                    indexes = []
 
                     empty_array[:, f] = np.where(counts > count_threshold, means, np.nan)
                     stddev_array[:, f] = np.where(counts > count_threshold, standard_deviations, np.nan)
                     counts_array[:, f] = counts
+                    indexes_list[f] = indexes
                     result_dict.update({field: empty_array})
                     stddev_dict.update({field: stddev_array})
                     count_dict.update({field: counts_array})
+                    indexes_dict.update({field: indexes_list})
             else:
                 if f == 0:
                     empty_array = np.zeros((means.shape[0], len(list_of_files)))
@@ -741,17 +751,21 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                     counts_array = np.zeros((means.shape[0], len(list_of_files)))
                     stddev_array[:] = np.nan
                     result_dict.update({'alts': alts})
+                    indexes_list = [None] * len(list_of_files)
                 else:
                     empty_array = result_dict[field]
                     stddev_array = stddev_dict[field]
                     counts_array = count_dict[field]
+                    indexes_list = indexes_dict[field]
 
                 empty_array[:, f] = np.where(counts > count_threshold, means, np.nan)
                 stddev_array[:, f] = np.where(counts > count_threshold, standard_deviations, np.nan)
                 counts_array[:, f] = counts
+                indexes_list[f] = indexes
                 result_dict.update({field: empty_array})
                 stddev_dict.update({field: stddev_array})
                 count_dict.update({field: counts_array})
+                indexes_dict.update({field: indexes_list})
                 sweep_time.append(timeofsweep)
 
         try:
@@ -764,4 +778,4 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
 
         radar = None
 
-    return result_dict, stddev_dict, count_dict, sweep_times, unit_dict, long_names, short_names
+    return result_dict, stddev_dict, count_dict, sweep_times, unit_dict, long_names, short_names, indexes_dict

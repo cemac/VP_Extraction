@@ -549,7 +549,8 @@ def output_netcdf(data_list, output_file, profile_type, field_list, elevation, a
      sweep_times,
      unit_dictionary,
      long_names,
-     short_names] = data_list
+     short_names,
+     indexes_dict] = data_list
 
     # dataset of the output
     output = Dataset(output_file, 'w', format='NETCDF4')
@@ -576,6 +577,9 @@ def output_netcdf(data_list, output_file, profile_type, field_list, elevation, a
     elif profile_type == "CVP":
         name_str = 'Column-vertical {} {}'
 
+    # Add variable length type for /VPIndexes entries
+    vlen_t = output.createVLType(np.int32, 'index_vlen')
+
     # Create the field variables
     # for each variable in the list we create several fields
     for field in field_list:
@@ -601,6 +605,17 @@ def output_netcdf(data_list, output_file, profile_type, field_list, elevation, a
             output[field].units = 'Default'
             output[field].long_name = 'Default'
             output[field].standard_name = 'Default'
+        # Create variables to store indexes used to calculate vertical profile for this field
+        vp_ind_r = output.createVariable(f'/{field}/VPIndexes/r', vlen_t, ('Height','Time'))
+        vp_ind_az = output.createVariable(f'/{field}/VPIndexes/az', vlen_t, ('Height','Time'))
+        vp_ind_el = output.createVariable(f'/{field}/VPIndexes/el', vlen_t, ('Height','Time'))
+        # Assign values
+        Nh, Nt = vp_ind_r.shape
+        for t in range(Nt):
+            for h in range(Nh):
+                vp_ind_r[h,t] = indexes_dict[field][t][h][0] # time, height, r
+                vp_ind_az[h,t] = indexes_dict[field][t][h][1] # time, height, az
+                vp_ind_el[h,t] = indexes_dict[field][t][h][2] # time, height, el
 
     if profile_type == "QVP":
         # add elevation attribute
