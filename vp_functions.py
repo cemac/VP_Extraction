@@ -181,7 +181,7 @@ def smooth(x,window_len=11,window='hanning'):
 def altitude_parameter_averaging_cvp(radar, cvp_index_data, field, avg_range_delta=5, azimuth_exclude = None, verbose=True):
 
     if verbose:
-        print ("altitude_parameter_averaging_cvp_static")
+        print ("altitude_parameter_averaging_cvp")
         print ("cvp_index_data = {}, field = {}, avg_range_delta = {}".format(cvp_index_data, field, avg_range_delta))
 
     bin_centers = []
@@ -357,7 +357,7 @@ def get_az_indexes(az,avg_az_delta, verbose = True):
 def get_r_indexes(r, steps_in_range_delta, max_range,verbose = True):
 
     if (verbose):
-        print ("in get_az_indexes(r = {},steps_in_range_delta = {})".format(r, steps_in_range_delta))
+        print ("in get_r_indexes(r = {}, steps_in_range_delta = {})".format(r, steps_in_range_delta))
 
     if(r+steps_in_range_delta>max_range):
         from_r = range(r-steps_in_range_delta-1,r)
