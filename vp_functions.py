@@ -375,7 +375,7 @@ def get_r_indexes(r, steps_in_range_delta, max_range,verbose = True):
     return(r_indxs)
 
 def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_delta,
-    azimuth_exclude = None, min_h = None, max_h = None, h_step = None, verbose=True):
+    azimuth_exclude = None, min_h = None, max_h = None, h_step = None, store_indexes=False, verbose=True):
 
     [r,az,el] = map(int, cvp_index)
 
@@ -496,7 +496,7 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
     equdist_std = np.zeros(equidistant_alt.shape[0])*np.nan
     equdist_count = np.zeros(equidistant_alt.shape[0])*np.nan
     equdist_total = np.zeros(equidistant_alt.shape[0])*np.nan
-    equdist_indexes = [None]*equidistant_alt.shape[0]
+    equdist_indexes = [None]*equidistant_alt.shape[0] if store_indexes else None
 
     for item, boundary  in enumerate(equidistant_bound[0:-1]):
 
@@ -509,9 +509,9 @@ def altitude_parameter_averaging_cvp_static(radar, field, cvp_index, avg_range_d
         equdist_std[item] = np.std(temp_column[valid_indexes])
         equdist_count[item] = len(valid_indexes)
         equdist_total[item] = len(temp_column)
-        # Store indexes that are included in generating means
-        temp_indexes = np.stack(bin_indexes)[:, valid_indexes]
-        equdist_indexes[item] = tuple(temp_indexes)
+        if store_indexes:
+            # Store indexes that are included in generating means
+            equdist_indexes[item] = tuple(np.stack(bin_indexes)[:, valid_indexes])
 
     if len(equidistant_alt) >= 300: win = 5
     else:win = 3
@@ -646,6 +646,7 @@ def altitude_parameter_averaging_qvp(radar, elevation, field, azimuth_exclude, v
 def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta = 5,
                 elevation = None, count_threshold=0,  met_office=False,
                 azimuth_exclude = [], min_h = None, max_h = None, h_step = None,
+                store_indexes=False,
                 verbose=False, vp_mode='qvp'):
 
     import itertools
@@ -695,7 +696,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
         sweep_time = []
 
         for field in field_list:
-            indexes = []
+            indexes = [] if store_indexes else None
             try:
                 if vp_mode == 'qvp':
                     (alts, counts, means, standard_deviations, timeofsweep) = \
@@ -708,7 +709,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                         altitude_parameter_averaging_cvp_static(radar, field,
                             cvp_index, avg_range_delta,
                             azimuth_exclude = azimuth_exclude, min_h=min_h,
-                            max_h=max_h, h_step=h_step, verbose=verbose)
+                            max_h=max_h, h_step=h_step, store_indexes=store_indexes, verbose=verbose)
                 elif vp_mode == 'cvp_dynamic':
                     (alts, counts, means, standard_deviations, timeofsweep) = \
                         altitude_parameter_averaging_cvp(radar, field,
@@ -733,12 +734,13 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                     counts[:] = np.nan
                     means[:] = np.nan
                     standard_deviations[:] = np.nan
-                    indexes = []
+                    indexes = [] if store_indexes else None
 
                     empty_array[:, f] = np.where(counts > count_threshold, means, np.nan)
                     stddev_array[:, f] = np.where(counts > count_threshold, standard_deviations, np.nan)
                     counts_array[:, f] = counts
-                    indexes_list[f] = indexes
+                    if store_indexes:
+                        indexes_list[f] = indexes
                     result_dict.update({field: empty_array})
                     stddev_dict.update({field: stddev_array})
                     count_dict.update({field: counts_array})
@@ -751,7 +753,7 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                     counts_array = np.zeros((means.shape[0], len(list_of_files)))
                     stddev_array[:] = np.nan
                     result_dict.update({'alts': alts})
-                    indexes_list = [None] * len(list_of_files)
+                    indexes_list = [None] * len(list_of_files) if store_indexes else None
                 else:
                     empty_array = result_dict[field]
                     stddev_array = stddev_dict[field]
@@ -761,7 +763,8 @@ def time_height(list_of_files, field_list, cvp_indexes = None, avg_range_delta =
                 empty_array[:, f] = np.where(counts > count_threshold, means, np.nan)
                 stddev_array[:, f] = np.where(counts > count_threshold, standard_deviations, np.nan)
                 counts_array[:, f] = counts
-                indexes_list[f] = indexes
+                if store_indexes:
+                    indexes_list[f] = indexes
                 result_dict.update({field: empty_array})
                 stddev_dict.update({field: stddev_array})
                 count_dict.update({field: counts_array})

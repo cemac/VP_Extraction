@@ -133,6 +133,10 @@ def parse_args():
                             dest="h_step", default = DEFAULT_H_STEP,
                             help="Column resulting profile resolution in m")
 
+    cvp_group.add_argument("-i", "--store-column-indexes",
+                           dest="store_indexes", action="store_true",
+                           help="Store indexes of points contributing to CVP values")
+
     # Options for QVP extraction
     qvp_group = parser.add_argument_group('QVP', 'Options for QVP extraction')
 
@@ -291,6 +295,7 @@ def get_cvp_options(avg_range_delta,
                     min_h,
                     max_h,
                     h_step,
+                    store_indexes,
                     verbose=False):
     '''
     Get options specific to CVP extraction: average range delta,
@@ -305,9 +310,9 @@ def get_cvp_options(avg_range_delta,
     min_h = float(min_h)
     max_h = float(max_h)
     h_step = float(h_step)
+    store_indexes = store_indexes
 
-
-    return (avg_range_delta, lat, lon, static_point, min_h, max_h, h_step)
+    return (avg_range_delta, lat, lon, static_point, min_h, max_h, h_step, store_indexes)
 
 
 def get_input_folder_glob_spec(input_dir,
@@ -476,7 +481,7 @@ def main():
 
     elif profile_type == 'CVP':
         # CVP specific options
-        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step  = \
+        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step, store_indexes = \
             get_cvp_options(args.avg_range_delta,
                             args.lat,
                             args.lon,
@@ -484,6 +489,7 @@ def main():
                             args.min_h,
                             args.max_h,
                             args.h_step,
+                            args.store_indexes,
                             verbose)
 
         # Filename for the output CVP file
@@ -553,6 +559,7 @@ def main():
             min_h = min_h,
             max_h = max_h,
             h_step = h_step,
+            store_indexes = store_indexes,
             verbose=verbose,
             vp_mode='cvp_static'
         )
