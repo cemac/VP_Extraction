@@ -2,15 +2,15 @@
 conda activate DRUID_VP
 function usage {
           echo "" 1>&2;
-          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -f <<file>> [-h] [-v]" 1>&2;
+          echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -c <<cfg_file>> [-h] [-v]" 1>&2;
           echo "" 1>&2;
           echo "Required Arguments: " 1>&2;
+          echo "  -r : radar name" 1>&2;
           echo "  -s : Start date for VP extraction" 1>&2;
           echo "  -e : End date for VP extraction" 1>&2;
-          echo "  -m : VP mode, either CVP or QVP (case sensitive)" 1>&2;
+          echo "  -c : Path to config file" 1>&2;
           echo "" 1>&2;
           echo "Options: " 1>&2;
-          echo "  -f : Path to parameters file (optional, currently only used for CVP extraction)" 1>&2;
           echo "  -h : Show this usage helper" 1>&2;
           echo "  -v : Run programs in verbose mode" 1>&2;
           echo "" 1>&2;
@@ -20,20 +20,23 @@ function usage {
 
 verbose="false"
 
-while getopts ":s:e:l:m:f:h" flag; do
+while getopts ":r:s:e:c" flag; do
     case "${flag}" in
+        r)
+            r=${OPTARG}
+            echo 'r='$r
+            ;;
         s)
             s=${OPTARG}
+            echo 's='$s
             ;;
         e)
             e=${OPTARG}
+            echo 'e='$e
             ;;
-        m)
-            m=${OPTARG}
-            ((m == 'CVP' || m == 'QVP')) || usage 1 "VP mode must be either QVP or CVP"
-            ;;
-        f)
-            f=${OPTARG}
+        c)
+            c=${OPTARG}
+            echo 'c='$c
             ;;
         h)
             usage 0 ""
@@ -48,13 +51,10 @@ while getopts ":s:e:l:m:f:h" flag; do
 done
 shift $((OPTIND-1))
 
-#Requires all three arguments
-if [ -z "${s}" ] || [ -z "${e}" ] || [ -z "${m}" ]; then
-    usage 1 "-s -e and -m arguments are all required"
+#Requires all these arguments
+if [ -z "${r}" ] || [ -z "${s}" ] || [ -z "${e}" ] ||  [ -z "${c}" ]; then
+    usage 1 "-r -s -e and -c arguments are all required"
 fi
-
-#Get site length for specified mode and params file
-site_len=$( ./vp_params.py "${m}" "${f}" )
 
 if [ $? != 0 ]; then
     exit
@@ -71,21 +71,19 @@ fi
 
 date_len=$(( ($date2 - $date1 )/(60*60*24)+1))
 date1_formatted=$( date -u -d @${date1} +'%Y%m%d')
-date2_formatted=$( date -u -d @${date2} +'%Y%m%d')
+#date2_formatted=$( date -u -d @${date2} +'%Y%m%d')
 
-Max_iter=$(( $date_len*$site_len ))
+Max_iter=$(( $date_len ))
 mkdir -p Output
-cat > vp_slurm.sb <<-EOF
-#!/bin/bash -l
-#SBATCH --job-name=${m}_job_array    # Job name
-#SBATCH --time=12:00:00             # Time limit per array task hrs:min:sec
-#SBATCH --output=Output/%j-%A_%a.out       # Standard output and error log
+this_date=$date1_formatted
+for ((i=1; i<=Max_Iter; i++))
+do
+    args=''
+    if [ verbose ]; then args='-v'; fi
+    
+    sbatch --account=ncas_radar --partition=standard --time=04:00:00 --output=Output/$r_${this_date}.out  --job-name=$r_${this_date} --wrap="vp_extraction.py -r $r -t $this_date -c $c $args" 
+    this_date=$(date +"%Y%m%d" -d "$this_date + 1 day")
 
-#SBATCH --array=1-$Max_iter              # Array range
-source activate DRUID_VP
-python VP_Main.py $m \$SLURM_ARRAY_TASK_ID $date1_formatted $date2_formatted $site_len $f $verbose
-EOF
+done
 
-echo "Created batch script for ${m} job, ${date1_formatted}-${date2_formatted}, ${site_len} sites."
-echo "Run this batch with:"
-echo "sbatch vp_slurm.sb"
+

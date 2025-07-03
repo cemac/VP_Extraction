@@ -45,7 +45,7 @@ ODIM_H5_FIELD_NAMES = {
 }
 
 
-def read_nimrod_aggregated_odim_h5(filename,data_type, time='0000', field_names=None, additional_metadata=None,
+def read_nimrod_aggregated_odim_h5(filename,data_type, time, log_file, field_names=None, additional_metadata=None,
                  file_field_names=False, exclude_fields=None,
                  include_fields=None, **kwargs):
     """
@@ -63,6 +63,8 @@ def read_nimrod_aggregated_odim_h5(filename,data_type, time='0000', field_names=
         string with the format hhmm that split the day into 144 ten minute chunks for sp data
         or 288 5 minute chunks for lp data from 0000 to 2350.
         Each period has been aggregated to make single volume.
+    log_file: str
+        full pathname where log file is
     field_names : dict, optional
         Dictionary mapping ODIM_H5 field names to radar field names. If a
         data type found in the file does not appear in this dictionary or has
@@ -125,9 +127,8 @@ def read_nimrod_aggregated_odim_h5(filename,data_type, time='0000', field_names=
         try:
             hfile=hfile[data_type][time]
         except:
-            output="/gws/smf/j04/ncas_radar/rrniii/BioDAR/CVP_Extraction/Output"
-            with open(output+'CVP_Cols_Done.txt', 'a') as log:
-                        log.write("No Data: "+time+'for '+data_type+' in '+filename+ '\n')
+            with open(log_file, 'a') as log:
+                log.write(datetime.datetime.today().strftime('%Y-%m-%d %H:%M: ')+"No Data "+time+'for '+data_type+' in '+filename+ '\n')
 
 
         odim_object = _to_str(hfile['what'].attrs['object'])
@@ -430,7 +431,7 @@ def _get_radar_name_from_radar_number(radar_number):
     if radar_number==3:
         radar_name='Clee Hill'
     if radar_number==16:
-        radar_name='Cobbacomebe Cross'
+        radar_name='Cobbacombe Cross'
     if radar_number==10:
         radar_name='Crug-y-gorrllwyn'
     if radar_number==21:
@@ -515,14 +516,14 @@ def return_names(radar, fields):
     return long_dictionary, short_dictionary
 
 
-def read_file(f, time, file_, fields,unit_dict=[],long_names=[], short_names=[], vp_mode='qvp', met_office=False, verbose=False):
+def read_file(f, time, file_, log_file, fields,unit_dict=[],long_names=[], short_names=[], vp_mode='QVP', met_office=False, verbose=False):
 
     if ".RAW" in file_:
         radar = read_sigmet(file_)
         radar = named_fields(radar)
     elif ".h5" in file_:
         data_type='lp'
-        radar = read_nimrod_aggregated_odim_h5(file_,data_type,time)
+        radar = read_nimrod_aggregated_odim_h5(file_,data_type,time, log_file)
         radar = named_fields(radar)
     else:
         radar = read(file_)
@@ -534,81 +535,10 @@ def read_file(f, time, file_, fields,unit_dict=[],long_names=[], short_names=[],
     try:
         if (verbose): print ("preprocessing is running")
         preprocessing(radar, vp_mode)
-        if not vp_mode=='qvp': shift_ppi(radar,fields)
+        if not vp_mode=='QVP': shift_ppi(radar,fields)
     except:
         print('Preprocessing failed for', file_)
 
     return (radar, unit_dict, long_names, short_names)
 
 
-def output_netcdf(data_list, output_file, profile_type, field_list, elevation, azimuth_exclude, n_time, verbose=False):
-
-    [result_dict,
-     stddev_dict,
-     count_dict,
-     sweep_times,
-     unit_dictionary,
-     long_names,
-     short_names] = data_list
-
-    # dataset of the output
-    output = Dataset(output_file, 'w', format='NETCDF4')
-
-    # Create dimensions
-    output.createDimension('Height', result_dict['alts'].shape[0])
-    output.createDimension('Time', len(sweep_times))
-    # Create coordinate variables for 2 dimensions
-    times = output.createVariable('Time', np.float64, ('Time',))
-    heights = output.createVariable('Height', np.float32, ('Height',))
-
-    time_units = 'seconds since %i-01-01T00:00:00Z' % sweep_times[0].year
-    number_times = [date2num(sweeptime, time_units, calendar='gregorian') for sweeptime in sweep_times]
-
-    ## Add values to the dimension variables
-    heights[:] = result_dict['alts']
-    times[:] = np.array(number_times)
-    times.units = time_units
-    times.calendar = "gregorian"
-    heights.units = "metres above sea level"
-
-    if profile_type == "QVP":
-        name_str = 'Quasi-vertical {} {} at an elevation angle of %.1f degrees' % elevation
-    elif profile_type == "CVP":
-        name_str = 'Column-vertical {} {}'
-
-    # Create the field variables
-    # for each variable in the list we create several fields
-    for field in field_list:
-        group_data_construct_means = '/'+field+'/Means'
-        group_data_construct_deviations = '/' + field + '/StdDevs'
-        group_data_construct_counts = '/' + field + '/Counts'
-        temp_means = output.createVariable(group_data_construct_means, np.float32, ('Height','Time'))
-        temp_stds = output.createVariable(group_data_construct_deviations, np.float32, ('Height', 'Time'))
-        temp_counts = output.createVariable(group_data_construct_counts, np.float32, ('Height', 'Time'))
-        temp_means[:] = result_dict[field]
-        temp_stds[:] = stddev_dict[field]
-        temp_counts[:] = count_dict[field]
-        temp_means.long_name = name_str.format('mean', field)
-        stdev_name = name_str.format('standard deviation of', field)
-        count_name = name_str.format('number of observations of', field)
-        temp_stds.long_name = stdev_name
-        temp_counts.long_name = count_name
-        if field in unit_dictionary.keys():
-            output[field].units = unit_dictionary[field]
-            output[field].long_name = long_names[field]
-            output[field].standard_name = short_names[field]
-        else:
-            output[field].units = 'Default'
-            output[field].long_name = 'Default'
-            output[field].standard_name = 'Default'
-
-    if profile_type == "QVP":
-        # add elevation attribute
-        output.elevation = elevation
-        output.excluded_azimuths = azimuth_exclude
-        output.excluded_azimuth_number = len(azimuth_exclude)
-
-    output.close()
-
-    if verbose:
-        print('New netcdf file created at {}'.format(output_file))

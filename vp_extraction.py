@@ -13,6 +13,7 @@ Authors:
  * Adapted by M. Lukach, May 2018
  * Adapted by R. Neely, March 2022
  * Adapted by T.D. James <t.d.james1@leeds.ac.uk>, June 2022
+ * Adapted by J.A. Crook June 2025 to read each file and do preprocessing and then loop round each cvp or qvp 
 
 :copyright: © 2022 University of Leeds.
 :license: BSD3
@@ -23,303 +24,56 @@ from __future__ import (absolute_import, division, print_function)
 
 import sys
 import os
-import re
 import glob
 import datetime as dt
 import argparse
-
+import itertools
 import numpy as np
 from dateutil.parser import parse as dateparse
+import h5py as h5
 
 import vp_functions
 import vp_io
-
-DEFAULT_TSTART = '20180214T000000'
-DEFAULT_TSTOP = '20180214T235959'
-DEFAULT_FIELD_LIST = {
-    'CVP': ['PhiDP', 'RhoHV', 'SQI', 'W', 'dBZ', 'ZDR', 'V'],
-    'QVP': ['dBZ', 'ZDR', 'RhoHV', 'PhiDP', 'V', 'W', 'SQI']
-}
-DEFAULT_COUNT_THRESHOLD = 0
-DEFAULT_AVG_RANGE_DELTA = 2.5
-DEFAULT_COLUMN_LAT = 51.78928
-DEFAULT_COLUMN_LON = -0.38672
-DEFAULT_STATIC_POINT = "Rothamsted"
-DEFAULT_MIN_H = 0
-DEFAULT_MAX_H = 2000
-DEFAULT_H_STEP = 200
+from vp import *
+import read_config
+import vp_grid_functions
 
 def parse_args():
     formatter = argparse.RawDescriptionHelpFormatter
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=formatter)
 
-    parser.add_argument('profile_type', type=str,
-                        choices=['QVP', 'CVP'], default="QVP",
-                        help='''Profile type (QVP or CVP)''')
-
-    parser.add_argument('input_dir', type=str,
-                        help="Path to input data")
-
-    parser.add_argument('output_dir', type=str,
-                        help="Path to output directory")
-
-    parser.add_argument("-d", "--debug",
-                        action="store_true",
-                        help=argparse.SUPPRESS)
-
+    parser.add_argument("-r", "--radar",
+                        dest='radar_name',
+                        help='''radar name''')
+    parser.add_argument("-c", "--cfg_file",
+                        dest='config_file',
+                        help='''config file defining how to extract (qvp/cvp) and in/out directories''')
     parser.add_argument("-v", "--verbose",
                         action="store_true",
                         help='''Print messages about the program execution
                         to the console (stdout)''')
 
-    parser.add_argument("-s", "--start-time",
-                        dest="tstart", default=DEFAULT_TSTART,
-                        help='''Start date and time (included) in format:
-                        "YYYYMMDDThhmmss"''')
+    parser.add_argument("-t", "--time",
+                        dest="timestamp",
+                        help='''timestamp of raw radar file:
+                        "YYYYMMDD" as used in raw radar directories/filenames''')
 
-    parser.add_argument("-e", "--end-time",
-                        dest="tstop", default=DEFAULT_TSTOP,
-                        help='''End date and time (included) in format:
-                        "YYYYMMDDThhmmss"''')
-
-    parser.add_argument("-f", "--fields",
-                        dest="field_list",
-                        default=None,
-                        help='''Space-separated list of variables to be
-                        used in profile extraction''')
-
-    parser.add_argument("-z", "--zoom-interval",
-                        default=None,
-                        help='''Time interval to zoom, specified as
-                        comma-separated values:
-                        \"YYYYMMDDThhmmss,YYYYMMDDThhmmss\"''')
-
-    parser.add_argument("-m", "--met-office",
-                        action="store_true",
-                        help='''Indicate that the source of the data is
-                        the Met office radars''')
-
-    # Options for CVP extraction
-    cvp_group = parser.add_argument_group('CVP', 'Options for CVP extraction')
-
-    cvp_group.add_argument("-r", "--column-radius",
-                           dest="avg_range_delta", default=DEFAULT_AVG_RANGE_DELTA,
-                           help='''The radius of the column for CVP extraction (km)''')
-
-    cvp_group.add_argument("-a", "--column-latitude",
-                           dest="lat", default=DEFAULT_COLUMN_LAT,
-                           help='''The latitude of the column for CVP extraction''')
-
-    cvp_group.add_argument("-o", "--column-longitude",
-                           dest="lon", default=DEFAULT_COLUMN_LON,
-                           help='''The longitude of the column for CVP extraction''')
-
-    cvp_group.add_argument("-p", "--column-position",
-                           dest="static_point", type=str,
-                           default=DEFAULT_STATIC_POINT,
-                           help='''The name of the static position of the column
-                           (station or lighting trap) for CVP extraction''')
-
-    cvp_group.add_argument("-k", "--column-minimum-altitude",
-                            dest="min_h", default = DEFAULT_MIN_H,
-                            help="Column lowest altitude in m")
-
-    cvp_group.add_argument("-j", "--column-maximum-altitude",
-                            dest="max_h", default = DEFAULT_MAX_H,
-                            help="Column highest altitude in m")
-
-    cvp_group.add_argument("-u", "--column-profile-resolution",
-                            dest="h_step", default = DEFAULT_H_STEP,
-                            help="Column resulting profile resolution in m")
-
-    # Options for QVP extraction
-    qvp_group = parser.add_argument_group('QVP', 'Options for QVP extraction')
-
-    qvp_group.add_argument("-l", "--elevation", type=float,
-                           help='''Elevation for QVP extraction''')
-
-    qvp_group.add_argument("-c", "--count-threshold",
-                           dest="count_threshold", default=DEFAULT_COUNT_THRESHOLD,
-                           help='''Minimal number of points for the mean value
-                           calculation at each range for QVP extraction''')
-
-    qvp_group.add_argument("-b", "--azimuth-bounds-to-exclude",
-                           dest="azimuth_bounds_to_exclude",
-                           help='''Azimuths that should be excluded in the mean
-                           value calculation for QVP extraction, specified as:
-                           \"start1,end1;start2,end2\"''')
-
+    
     args = parser.parse_args()
-
-    # Check if input directory exists
-    if not os.path.exists(args.input_dir):
-        err_msg = "Input dir {0} does not exist\n"
-        err_msg = err_msg.format(args.input_dir)
-        raise ValueError(err_msg)
-
-    if args.profile_type == "QVP" and args.elevation == None:
-        raise argparse.ArgumentError(None,
-                                     "argument --elevation is required for QVP extraction")
-
     return args
-
-
-def get_field_list(field_list,
-                   profile_type,
-                   verbose=False):
-    '''
-    Get list of fields to include in profile.
-
-    '''
-
-    if field_list is None:
-        field_list = DEFAULT_FIELD_LIST[profile_type]
-
-    if not type(field_list) is list:
-        field_list = field_list.split(',')
-
-    return field_list
-
-
-def get_event_date(tstart,
-                   tstop,
-                   verbose=False):
-    '''
-    Get event date string based on the specified start time.
-
-    Also returns start and end times as datetime objects.
-    '''
-
-    start_datetime = dateparse(tstart)
-    stop_datetime = dateparse(tstop)
-
-    if verbose:
-        print("start datetime is ", start_datetime)
-        print("stop datetime is ", stop_datetime)
-
-    # Define event date
-    date_fmt = '%Y%m%d'
-    event_date = start_datetime.strftime(date_fmt)
-
-    # Check if start and end datetimes belong to the same day
-    start_date = dt.datetime.strptime(event_date, date_fmt)
-    stop_date = dt.datetime.strptime(stop_datetime.strftime(date_fmt),
-                                     date_fmt)
-
-    if not stop_date - start_date < dt.timedelta(1):
-        # TODO define and handle a list of event dates
-        if verbose:
-            print("Start and end dates span more than one day")
-
-    return (start_datetime, stop_datetime, event_date)
-
-
-def get_zoom_interval(zoom_interval,
-                      start_datetime,
-                      stop_datetime,
-                      verbose=False):
-    '''
-    Parse zoom interval and return start and end datetimes for the
-    interval.
-
-    '''
-    if type(zoom_interval) is str:
-        zoom_interval = tuple(zoom_interval.split(","))
-
-    if zoom_interval and len(zoom_interval) == 2:
-        zoom_start = dateparse(zoom_interval[0])
-        zoom_end = dateparse(zoom_interval[1])
-    else:
-        if verbose:
-            print('''Zoom interval should be specified as a list of two dates.
-            Using start and end dates instead.''')
-        zoom_start = start_datetime
-        zoom_end = stop_datetime
-
-    return zoom_start, zoom_end
-
-
-def get_qvp_options(elevation,
-                    count_threshold,
-                    azimuth_bounds_to_exclude,
-                    verbose=False):
-    '''
-    Get options specific to QVP extraction: elevation, count
-    threshold and azimuth bounds to exclude.
-
-    '''
-    # elevation
-    elevation = float(elevation)
-    if verbose:
-        print("elevation is ", elevation)
-
-    # minimal number of valuable pixels in each range
-    count_threshold = int(count_threshold)
-    if verbose:
-        print("count threshold is ", count_threshold)
-
-    # exclude parts of domain that are partially or completely blocked
-    azimuth_exclude = []
-    if azimuth_bounds_to_exclude != None:
-        azimuth_bounds = [x.split(',') for x in azimuth_bounds_to_exclude.split(';')]
-        azimuth_chunks = []
-        for chunk in azimuth_bounds:
-            if len(chunk) != 2:
-                if verbose:
-                    print ('''Azimuth exclusion configuration incorrect.
-                    Should be input as "start1,end1;start2,end2;..."\n
-                    Skipping azimuth exclusion chunk: %s''' % chunk)
-            else:
-                index = np.sort(np.array(chunk, dtype=int))
-                if index[0] == index[1]:
-                    azimuth_chunks.append(np.array([index[0]]))
-                else:
-                    azimuth_chunks.append(np.arange(index[0], index[1]))
-        if len(azimuth_chunks):
-            azimuth_exclude = np.concatenate(azimuth_chunks)
-    if verbose:
-        print("azimuth values to exclude are ", azimuth_exclude)
-
-    return (elevation, count_threshold, azimuth_exclude)
-
-
-def get_cvp_options(avg_range_delta,
-                    lat,
-                    lon,
-                    static_point,
-                    min_h,
-                    max_h,
-                    h_step,
-                    verbose=False):
-    '''
-    Get options specific to CVP extraction: average range delta,
-    latitude, longitude and static point label.
-
-    '''
-
-    avg_range_delta = float(avg_range_delta)
-    lat = float(lat)
-    lon = float(lon)
-    static_point = static_point
-    min_h = float(min_h)
-    max_h = float(max_h)
-    h_step = float(h_step)
-
-
-    return (avg_range_delta, lat, lon, static_point, min_h, max_h, h_step)
 
 
 def get_input_folder_glob_spec(input_dir,
                                profile_type,
-                               elevation,
-                               event_date,
+                               vertical,
+                               timestamp,
                                met_office,
                                verbose=False):
     '''
     Get pattern for matching files in input folder.
 
-    The matching pattern depends on profile type and source of radar scan data.
+    The matching pattern depends on profile type (vertical scan for QVP) and source of radar scan data.
     '''
 
     # Path to the directory with the radar scans
@@ -331,12 +85,12 @@ def get_input_folder_glob_spec(input_dir,
 
     # Handle different options for input directory structure
     if met_office:
-        folder_glob_spec = '{}/*.h5'.format(folder_with_files)
+        folder_glob_spec = '{}/{}_*.h5'.format(folder_with_files, timestamp)
     else:
-        if profile_type == 'QVP' and elevation == 90.0:
-            folder_glob_spec = '{}/{}/ver/*.nc'.format(folder_with_files, event_date)
+        if profile_type == 'QVP' and vertical:
+            folder_glob_spec = '{}/{}/ver/*.nc'.format(folder_with_files, timestamp)
         else:
-            folder_glob_spec = '{}/{}/*.nc'.format(folder_with_files, event_date)
+            folder_glob_spec = '{}/{}/*.nc'.format(folder_with_files, timestamp)
     if verbose:
         print(("Input folder glob spec is {}").format(folder_glob_spec))
 
@@ -345,10 +99,8 @@ def get_input_folder_glob_spec(input_dir,
 
 def get_file_list(input_dir,
                   profile_type,
-                  elevation,
-                  event_date,
-                  start_datetime,
-                  stop_datetime,
+                  vertical,
+                  timestamp,
                   met_office,
                   verbose=False):
     '''
@@ -359,34 +111,14 @@ def get_file_list(input_dir,
     # Get file matching pattern
     folder_glob_spec = get_input_folder_glob_spec(input_dir,
                                                   profile_type,
-                                                  elevation,
-                                                  event_date,
+                                                  vertical,
+                                                  timestamp,
                                                   met_office,
                                                   verbose)
 
     # select all files available in the directory
     file_list = glob.glob(folder_glob_spec)
     file_list.sort()
-
-    if (met_office):
-        # match files in specified date range
-        match_file_list = []
-        for f in file_list:
-            file = os.path.basename(f)
-            regex = r'(\d{8})(_)|(\d{6})(\d{6})|(\d{8})(-*)(\d{6})'
-            timestamp_search = re.search(regex, file, re.IGNORECASE)
-            if timestamp_search:
-                # TODO check selection of date string
-                if timestamp_search.group(1) != None:
-                    timestr = timestamp_search.group(1)
-                elif timestamp_search.group(3) != None:
-                    timestr = timestamp_search.group(3)
-                elif timestamp_search.group(5) != None:
-                    timestr = timestamp_search.group(5)
-                timestamp = dateparse(timestr)
-                if timestamp >= start_datetime and timestamp <= stop_datetime:
-                    match_file_list.append(f)
-        file_list = match_file_list
 
     if verbose:
         print("file_list")
@@ -398,178 +130,208 @@ def get_file_list(input_dir,
 
     return file_list
 
-
-def get_output_filepath(output_dir,
-                        output_filename,
-                        profile_type,
-                        event_date,
-                        verbose=False):
-    '''
-    Get output file path.
-
-    '''
-
-    # Path to output directory
-    output_dir = os.path.normpath(output_dir)
-
-    if profile_type == 'QVP':
-        output_dir = '{}/{}_QVP'.format(output_dir, event_date)
-
-    if verbose:
-        print("Path to output directory is", output_dir)
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-
-    # path and filename for the output file
-    output_file = '{}/{}'.format(output_dir, output_filename)
-
-    if verbose:
-        print("Output will be placed in {}".format(output_file))
-
-    return output_file
-
-
 def main():
 
     #### Input management
 
     args = parse_args()
-
-    debug = args.debug
+    config_file=args.config_file
+    config = read_config.read_config(args.config_file)
+    # get the timestamp as a datetime
+    timestamp=args.timestamp
+    t_datetime = dateparse(timestamp)
+    
     verbose = args.verbose
 
     # True if the data are from the met office radar
-    met_office = args.met_office
+    met_office = config['MET_OFFICE']
 
     # Profile type (QVP or CVP)
-    profile_type = args.profile_type
+    profile_type = config['PROFILE_TYPE']
+    
+    input_dir=os.path.join(config['DATA_INPUT'],args.radar_name,str(t_datetime.year))   
+    # Check if input directory exists
+    if not os.path.exists(input_dir):
+        err_msg = "Input dir {0} does not exist\n"
+        err_msg = err_msg.format(input_dir)
+        raise ValueError(err_msg)
+    output_dir=os.path.join(config['DATA_OUTPUT'],args.radar_name)
+    
+    if profile_type=='CVP':
+        vertical=False # only used for QVPs
+        nheights=int(config['MAX_H']/config['H_STEP'])
+        equidistant_alt = np.linspace((config['MIN_H'] + config['H_STEP']/2), (config['MAX_H'] - config['H_STEP']/2), num=nheights)
+        equidistant_bound = np.linspace((config['MIN_H']), (config['MAX_H']), num=nheights+1)
+        output_dir=output_dir+'/{}km/'.format(config['COL_RADIUS'])
+        ngrids=0
+    else:
+        azimuth_exclude=config['AZIMUTHS_TO_EXCLUDE']
+        elevations=config['ELEVATIONS']
+        vertical=elevations[0]==90 # if we are doing vertical radar sweep this should be the only elevation as the files are else where
+        output_dir = '{}/{}_QVP/'.format(output_dir, args.timestamp)
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
 
-    # List of variables in original scan that will be used in profile
-    # extraction
-    field_list = get_field_list(args.field_list,
-                                profile_type,
-                                verbose)
-
-    # Event date(s)
-    start_datetime, stop_datetime, event_date = get_event_date(args.tstart,
-                                                               args.tstop,
-                                                               verbose)
-
-    # Zoom interval
-    zoom_start, zoom_end = get_zoom_interval(args.zoom_interval,
-                                             start_datetime,
-                                             stop_datetime,
-                                             verbose)
-
-    if profile_type == 'QVP':
-        # QVP specific options
-        elevation, count_threshold, azimuth_exclude = \
-            get_qvp_options(args.elevation,
-                            args.count_threshold,
-                            args.azimuth_bounds_to_exclude,
-                            verbose)
-
-        # Filename for the output QVP file
-        # e.g. 20170517_QVP_20.0deg.nc
-        output_filename = '{}_QVP_{:.1f}deg.nc'.format(event_date, elevation)
-
-    elif profile_type == 'CVP':
-        # CVP specific options
-        avg_range_delta, lat, lon, static_point, min_h, max_h, h_step  = \
-            get_cvp_options(args.avg_range_delta,
-                            args.lat,
-                            args.lon,
-                            args.static_point,
-                            args.min_h,
-                            args.max_h,
-                            args.h_step,
-                            verbose)
-
-        # Filename for the output CVP file
-        # e.g. Rothamsted_10km_20170517.nc
-        output_filename = '{}_{}km_{}.nc'.format(static_point,
-                                                 avg_range_delta,
-                                                 event_date)
-
-        # Dummy values for elevation and azimuth_exclude
-        elevation = 0
-        azimuth_exclude = []
-
-        # For static CVP, set alt to zero
-        alt = 0
-
+        
     # File list
-    file_list = get_file_list(args.input_dir,
+    file_list = get_file_list(input_dir,
                               profile_type,
-                              elevation,
-                              event_date,
-                              start_datetime,
-                              stop_datetime,
+                              vertical,
+                              args.timestamp,
                               met_office,
                               verbose)
 
-    # Output file path
-    output_filepath = get_output_filepath(args.output_dir,
-                                          output_filename,
-                                          profile_type,
-                                          event_date,
-                                          verbose)
-
-    #### Processing
-
-    if profile_type == "QVP":
-        # Extract QVP
-        data_list = vp_functions.time_height(
-            file_list,
-            field_list,
-            elevation=elevation,
-            count_threshold=count_threshold,
-            azimuth_exclude=azimuth_exclude,
-            met_office=met_office,
-            verbose=verbose,
-            vp_mode='qvp'
-        )
-    elif profile_type == "CVP":
-
-        # Get CVP indexes
-        cvp_indexes = vp_functions.static_index_for_csv_file(
-            file_list[0],
-            len(file_list),
-            field_list,
-            lat,
-            lon,
-            alt,
-            met_office=met_office
-        )
-
-        # Extract CVP
-        data_list = vp_functions.time_height(
-            file_list,
-            field_list,
-            cvp_indexes=cvp_indexes,
-            avg_range_delta=avg_range_delta,
-            met_office=met_office,
-            min_h = min_h,
-            max_h = max_h,
-            h_step = h_step,
-            verbose=verbose,
-            vp_mode='cvp_static'
-        )
+    # read the files one at a time and one time from them at a time
+    defaulttime = [dt.datetime(1970,1,1,0,0,0)]
+    if(met_office):
+        # there should only be one file so get the times from it
+        testfile = h5.File(file_list[0], 'r')
+        times = list(testfile['lp'].keys())
+        file_list = list(itertools.chain.from_iterable(itertools.repeat(x, len(times)) for x in file_list))
+        testfile.close()
     else:
-        raise ValueError("Unrecognised profile type")
+        # there will be files with each time for the day
+        times = [defaulttime]
+
+    vps=[]
+    unit_dict = []
+    long_names = []
+    short_names = []
+    ntimes=len(file_list)
+    for f, file_ in enumerate(file_list):
+        if (verbose):
+            print ("file f {} is {}".format(f,file_))
+
+        # Edited function call so that different call not needed for metoffice=True
+        (radar, unit_dict, long_names, short_names) = \
+            vp_io.read_file(f, times[f%len(times)], file_list[f], config['LOG_OUTPUT'], config['FIELD_LIST'], unit_dict,
+                      long_names, short_names, met_office=met_office, verbose=verbose)
+
+        radar_lat, radar_lon=vp_functions.get_centre_lat_lon_for_radar(radar)
+        if verbose:
+            print('radar at lat lon', radar_lat, radar_lon)
+        nazimuths=int(radar.nrays/radar.nsweeps)
+        if profile_type == "QVP":
+            for i in range(len(elevations)):
+                if f==0:
+                    output_file=output_dir+'{}_QVP_{:.1f}deg.nc'.format(args.timestamp, elevations[i])
+                    # create a vertical profile object
+                    radar_elevations = radar.elevation['data'].reshape((radar.nsweeps,nazimuths))
+                    radar_elevations=radar_elevations[:,0] # elevations are same for all azimuths
+                    eix=np.argmin(radar_elevations-elevations[i])
+                    # getting altitudes here assumes altitudes are always the same
+                    if elevations[i] == 90.0:
+                        altitudes = radar.range['data']
+                    else:
+                        altitudes = radar.fields['scan_altitude']['data'].reshape(radar.nsweeps,nazimuths,radar.ngates)
+                        altitudes=altitudes[eix,0,:]
+                        
+                    global_attrs={}
+                    global_attrs['radar_name']=args.radar_name
+                    global_attrs['profile_type']=profile_type
+                    global_attrs['elevation']=elevations[i]
+                    azimuth_exc_strs=[str(from_to[0])+'-'+str(from_to[1]) for from_to in azimuth_exclude]
+                    azimuth_exc_str=', '.join(azimuth_exc_strs)
+                    global_attrs['azimuths_excluded']=azimuth_exc_str
+                    vps.append(VerticalProfile(ntimes, altitudes, config['FIELD_LIST'], long_names, short_names, unit_dict, global_attrs, output_file))
+                    if verbose:
+                        print("Output will be placed in {} for elevation".format(output_file), elevations[i])
+                else:
+                    if elevations[i] == 90.0:
+                        altitudes = radar.range['data']
+                    else:
+                        altitudes = radar.fields['scan_altitude']['data'].reshape(radar.nsweeps,nazimuths,radar.ngates)
+                        altitudes=altitudes[eix,0,:]
+                    max_diff=np.amax(abs(vps[i].heights-altitudes))
+                    if max_diff>0.1:
+                        raise Exception('QVP has different altitudes at different times')
+                this_vp=vps[i]
+                # Extract QVP
+                if verbose:
+                    print('extracting QVP for elevation', elevations[i], 'for time', times[f%len(times)])
+                vp_functions.time_height_qvp(radar,
+                                             this_vp,
+                                             config['FIELD_LIST'],
+                                             f,
+                                             elevations[i],
+                                             azimuth_exclude=azimuth_exclude,
+                                             verbose=verbose)
+                 
+
+        elif profile_type == 'CVP':
+            if config['CREATE_CVP_GRID']:
+                if f==0:
+                    # get the centre lat lon of the radar and then calculate the lat lons of the grids
+                    grid_lat_lons, grid_bounds=vp_grid_functions.get_cvp_grid_lat_lons(radar_lat, radar_lon,
+                                                                          config['COL_RADIUS'],config['MAX_RADIUS'])
+                    ngrids=grid_lat_lons.shape[0]
+
+                for gid in range(ngrids):
+                    if f==0:
+                        site_name='{}_GridID_{:03d}'.format(args.radar_name, gid+1)
+                        this_output_dir=output_dir+site_name+'/{}/'.format(t_datetime.year)
+                        if not os.path.exists(this_output_dir):
+                            os.makedirs(this_output_dir)
+                        output_file=this_output_dir+'{}_{}km_{}.nc'.format(site_name,
+                                                                          config['COL_RADIUS'],
+                                                                          args.timestamp)
+                        global_attrs={}
+                        global_attrs['radar_name']=args.radar_name
+                        global_attrs['profile_type']=profile_type
+                        vps.append(VerticalProfile(ntimes, equidistant_alt, config['FIELD_LIST'], long_names, short_names, unit_dict, global_attrs, output_file))
+                        vps[-1].set_lat_lon_and_bounds(grid_lat_lons[gid,:], grid_bounds[gid,:,:])
+
+                    this_vp=vps[gid]
+                    # Extract CVP
+                    if verbose:
+                        print('extracting CVP grid', gid+1, 'for time', times[f%len(times)])
+                    vp_functions.time_height_cvp(radar,
+                                                 this_vp,
+                                                 config['COL_RADIUS'],
+                                                 config['FIELD_LIST'],
+                                                 f,
+                                                 equidistant_bound,
+                                                 verbose=verbose)
+            for item, specific_cvp in enumerate(config['SPECIFIC_CVP']):
+                if f==0:
+                    site_name='{}_{}'.format(args.radar_name, specific_cvp[2])
+                    this_output_dir=output_dir+site_name+'/{}/'.format(t_datetime.year)
+                    if not os.path.exists(this_output_dir):
+                        os.makedirs(this_output_dir)
+                    output_file=this_output_dir+'/{}_{}km_{}.nc'.format(site_name,
+                                                                       config['COL_RADIUS'],
+                                                                       args.timestamp)
+                    global_attrs={}
+                    global_attrs['radar_name']=args.radar_name
+                    global_attrs['profile_type']=profile_type
+                    vps.append(VerticalProfile(ntimes, equidistant_alt, config['FIELD_LIST'], long_names, short_names, unit_dict, global_attrs, output_file))
+                    lat_lon_bounds=vp_grid_functions.get_specific_cvp_lat_lon_bounds(specific_cvp[0], specific_cvp[1], config['COL_RADIUS'])
+                    vps[-1].set_lat_lon_and_bounds(specific_cvp[:2], lat_lon_bounds)
+                this_vp=vps[ngrids+item]
+                # Extract CVP
+                if verbose:
+                    print('extracting specific CVP', specific_cvp[2], 'for time', times[f%len(times)])
+                vp_functions.time_height_cvp(radar,
+                                             this_vp,
+                                             config['COL_RADIUS'],
+                                             config['FIELD_LIST'],
+                                             f,
+                                             equidistant_bound,
+                                             verbose=verbose)
+        else:
+            raise ValueError("Unrecognised profile type")
 
     #### Output management
 
-    # Output to NetCDF
-    vp_io.output_netcdf(data_list,
-                            output_filepath,
-                            profile_type,
-                            field_list,
-                            elevation,
-                            azimuth_exclude,
-                            len(file_list),
-                            verbose=verbose)
+    # Output all vps to NetCDF
+    for vp in vps:
+        if verbose:
+            # lons and lats are expected to be the same 
+            print(vp.output_file, 'cvp, lon:', np.mean(vp.lons),'lat:', np.mean(vp.lats), 'complete')
+
+        vp.output_netcdf(verbose=verbose)
+        with open(config['LOG_OUTPUT'], 'a') as log:
+            log.write(dt.datetime.today().strftime('%Y-%m-%d %H:%M: ')+profile_type+' created '+vp.output_file+ '\n')
 
     # end main()
 
