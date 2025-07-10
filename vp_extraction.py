@@ -37,6 +37,7 @@ import vp_io
 from vp import *
 import read_config
 import vp_grid_functions
+import pdb
 
 def parse_args():
     formatter = argparse.RawDescriptionHelpFormatter
@@ -87,10 +88,7 @@ def get_input_folder_glob_spec(input_dir,
     if met_office:
         folder_glob_spec = '{}/{}_*.h5'.format(folder_with_files, timestamp)
     else:
-        if profile_type == 'QVP' and vertical:
-            folder_glob_spec = '{}/{}/ver/*.nc'.format(folder_with_files, timestamp)
-        else:
-            folder_glob_spec = '{}/{}/*.nc'.format(folder_with_files, timestamp)
+        folder_glob_spec = '{}/*{}*.nc'.format(folder_with_files, timestamp)
     if verbose:
         print(("Input folder glob spec is {}").format(folder_glob_spec))
 
@@ -121,8 +119,6 @@ def get_file_list(input_dir,
     file_list.sort()
 
     if verbose:
-        print("file_list")
-        print(file_list)
         if file_list:
             print('First file is:', file_list[0])
             print('Last file is:', file_list[-1])
@@ -149,29 +145,28 @@ def main():
     # Profile type (QVP or CVP)
     profile_type = config['PROFILE_TYPE']
     
-    input_dir=os.path.join(config['DATA_INPUT'],args.radar_name,str(t_datetime.year))   
+    input_dir=t_datetime.strftime(config['DATA_INPUT']) # add defined part of the timestamp (could be just year or whole timestamp)
     # Check if input directory exists
     if not os.path.exists(input_dir):
         err_msg = "Input dir {0} does not exist\n"
         err_msg = err_msg.format(input_dir)
         raise ValueError(err_msg)
-    output_dir=os.path.join(config['DATA_OUTPUT'],args.radar_name)
+    output_dir=config['DATA_OUTPUT']
     
     if profile_type=='CVP':
         vertical=False # only used for QVPs
         nheights=int(config['MAX_H']/config['H_STEP'])
         equidistant_alt = np.linspace((config['MIN_H'] + config['H_STEP']/2), (config['MAX_H'] - config['H_STEP']/2), num=nheights)
         equidistant_bound = np.linspace((config['MIN_H']), (config['MAX_H']), num=nheights+1)
-        output_dir=output_dir+'/{}km/'.format(config['COL_RADIUS'])
+        output_dir=output_dir+'{}km/'.format(config['COL_RADIUS'])
         ngrids=0
     else:
         azimuth_exclude=config['AZIMUTHS_TO_EXCLUDE']
         elevations=config['ELEVATIONS']
         vertical=elevations[0]==90 # if we are doing vertical radar sweep this should be the only elevation as the files are else where
-        output_dir = '{}/{}_QVP/'.format(output_dir, args.timestamp)
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
 
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
         
     # File list
     file_list = get_file_list(input_dir,
@@ -208,6 +203,9 @@ def main():
                       long_names, short_names, met_office=met_office, verbose=verbose)
 
         radar_lat, radar_lon=vp_functions.get_centre_lat_lon_for_radar(radar)
+        timeofsweep = num2date(np.nanmean(radar.time['data'][:]),
+                                          radar.time['units'],
+                                          radar.time['calendar'])
         if verbose:
             print('radar at lat lon', radar_lat, radar_lon)
         nazimuths=int(radar.nrays/radar.nsweeps)
@@ -230,6 +228,7 @@ def main():
                     global_attrs['radar_name']=args.radar_name
                     global_attrs['profile_type']=profile_type
                     global_attrs['elevation']=elevations[i]
+                    global_attrs['from_input']=input_dir
                     azimuth_exc_strs=[str(from_to[0])+'-'+str(from_to[1]) for from_to in azimuth_exclude]
                     azimuth_exc_str=', '.join(azimuth_exc_strs)
                     global_attrs['azimuths_excluded']=azimuth_exc_str
@@ -248,7 +247,7 @@ def main():
                 this_vp=vps[i]
                 # Extract QVP
                 if verbose:
-                    print('extracting QVP for elevation', elevations[i], 'for time', times[f%len(times)])
+                    print('extracting QVP for elevation', elevations[i], 'for time', timeofsweep)
                 vp_functions.time_height_qvp(radar,
                                              this_vp,
                                              config['FIELD_LIST'],
@@ -278,13 +277,14 @@ def main():
                         global_attrs={}
                         global_attrs['radar_name']=args.radar_name
                         global_attrs['profile_type']=profile_type
+                        global_attrs['from_input']=input_dir
                         vps.append(VerticalProfile(ntimes, equidistant_alt, config['FIELD_LIST'], long_names, short_names, unit_dict, global_attrs, output_file))
                         vps[-1].set_lat_lon_and_bounds(grid_lat_lons[gid,:], grid_bounds[gid,:,:])
 
                     this_vp=vps[gid]
                     # Extract CVP
                     if verbose:
-                        print('extracting CVP grid', gid+1, 'for time', times[f%len(times)])
+                        print('extracting CVP grid', gid+1, 'for time', timeofsweep)
                     vp_functions.time_height_cvp(radar,
                                                  this_vp,
                                                  config['COL_RADIUS'],
@@ -304,13 +304,14 @@ def main():
                     global_attrs={}
                     global_attrs['radar_name']=args.radar_name
                     global_attrs['profile_type']=profile_type
+                    global_attrs['from_input']=input_dir
                     vps.append(VerticalProfile(ntimes, equidistant_alt, config['FIELD_LIST'], long_names, short_names, unit_dict, global_attrs, output_file))
                     lat_lon_bounds=vp_grid_functions.get_specific_cvp_lat_lon_bounds(specific_cvp[0], specific_cvp[1], config['COL_RADIUS'])
                     vps[-1].set_lat_lon_and_bounds(specific_cvp[:2], lat_lon_bounds)
                 this_vp=vps[ngrids+item]
                 # Extract CVP
                 if verbose:
-                    print('extracting specific CVP', specific_cvp[2], 'for time', times[f%len(times)])
+                    print('extracting specific CVP', specific_cvp[2], 'for time', timeofsweep)
                 vp_functions.time_height_cvp(radar,
                                              this_vp,
                                              config['COL_RADIUS'],
@@ -330,8 +331,8 @@ def main():
             print(vp.output_file, 'cvp, lon:', np.mean(vp.lons),'lat:', np.mean(vp.lats), 'complete')
 
         vp.output_netcdf(verbose=verbose)
-        with open(config['LOG_OUTPUT'], 'a') as log:
-            log.write(dt.datetime.today().strftime('%Y-%m-%d %H:%M: ')+profile_type+' created '+vp.output_file+ '\n')
+    with open(config['LOG_OUTPUT'], 'a') as log:
+        log.write(dt.datetime.today().strftime('%Y-%m-%d %H:%M: ')+profile_type+' created for '+input_dir+ '\n')
 
     # end main()
 

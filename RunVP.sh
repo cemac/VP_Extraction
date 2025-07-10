@@ -1,5 +1,6 @@
 #! /bin/bash -l
-conda activate DRUID_VP
+#conda init
+#conda activate DRUID_VP
 function usage {
           echo "" 1>&2;
           echo "Usage: $0 -s <<YYYYmmdd>> -e <<YYYYmmdd>> -m <<CVP|QVP>> -c <<cfg_file>> [-h] [-v]" 1>&2;
@@ -20,23 +21,19 @@ function usage {
 
 verbose="false"
 
-while getopts ":r:s:e:c" flag; do
+while getopts ":r:s:e:c:h:v" flag; do
     case "${flag}" in
         r)
             r=${OPTARG}
-            echo 'r='$r
             ;;
         s)
             s=${OPTARG}
-            echo 's='$s
             ;;
         e)
             e=${OPTARG}
-            echo 'e='$e
             ;;
         c)
             c=${OPTARG}
-            echo 'c='$c
             ;;
         h)
             usage 0 ""
@@ -60,9 +57,11 @@ if [ $? != 0 ]; then
     exit
 fi
 
+
+mkdir -p Output
+echo 'RunVP.sh -r' $r '-s' $s '-e' $e '-c' $c $verbose
 date1=$( date -d $s +%s )
 date2=$( date -d $e +%s )
-
 if  [ $date2 -lt $date1 ]; then
   echo "start date occurs after end date. Swapping dates"
   date2=$( date -d $s +%s )
@@ -70,20 +69,21 @@ if  [ $date2 -lt $date1 ]; then
 fi
 
 date_len=$(( ($date2 - $date1 )/(60*60*24)+1))
-date1_formatted=$( date -u -d @${date1} +'%Y%m%d')
-#date2_formatted=$( date -u -d @${date2} +'%Y%m%d')
+Max_iter=$(( $date_len -1))
 
-Max_iter=$(( $date_len ))
-mkdir -p Output
-this_date=$date1_formatted
-for ((i=1; i<=Max_Iter; i++))
-do
-    args=''
-    if [ verbose ]; then args='-v'; fi
-    
-    sbatch --account=ncas_radar --partition=standard --time=04:00:00 --output=Output/$r_${this_date}.out  --job-name=$r_${this_date} --wrap="vp_extraction.py -r $r -t $this_date -c $c $args" 
-    this_date=$(date +"%Y%m%d" -d "$this_date + 1 day")
+cat > vp_slurm.sb <<-EOF
+#!/bin/bash -l
+#SBATCH --account=ncas_radar
+#SBATCH --partition=standard
+#SBATCH --qos=standard
+#SBATCH --job-name=${r}              # Job name
+#SBATCH --time=4:00:00             # Time limit per array task hrs:min:sec
+#SBATCH --output=Output/${r}_%j-%A_%a.out       # Standard output and error log
+#SBATCH --array=0-$Max_iter              # Array range
+#SBATCH --mem 50
+source ./VP_Main.sh ${r} ${s} ${c} \$SLURM_ARRAY_TASK_ID 
+EOF
 
-done
-
+echo "running batch script for ${r}, ${s}, ${c} ${Max_iter} days."
+sbatch vp_slurm.sb
 

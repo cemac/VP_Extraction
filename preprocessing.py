@@ -179,7 +179,7 @@ def preprocessing(radar, vp_mode):
         print ('Beam height failed')
         raise
 
-    if vp_mode == 'qvp': remove_nearest_bins(radar)
+    if vp_mode == 'QVP': remove_nearest_bins(radar)
 
     if 'KDP' in radar.fields.keys():
         if 'RhoHV' in radar.fields.keys() and 'uPhiDP' in radar.fields.keys():

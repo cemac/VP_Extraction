@@ -128,13 +128,12 @@ def read_nimrod_aggregated_odim_h5(filename,data_type, time, log_file, field_nam
             hfile=hfile[data_type][time]
         except:
             with open(log_file, 'a') as log:
-                log.write(datetime.datetime.today().strftime('%Y-%m-%d %H:%M: ')+"No Data "+time+'for '+data_type+' in '+filename+ '\n')
-
+                log.write(datetime.datetime.today().strftime('%Y-%m-%d %H:%M: ')+'No Data '+data_type+' for '+time+' in '+filename+ '\n')
+                raise Exception(filename+' cannot read {} for time {}'.format(data_type, time))
 
         odim_object = _to_str(hfile['what'].attrs['object'])
         if odim_object not in ['PVOL', 'SCAN', 'ELEV', 'AZIM']:
-            raise NotImplementedError(
-                'object: %s not implemented.' % (odim_object))
+            raise NotImplementedError('object: %s not implemented.' % (odim_object))
 
         # determine the number of sweeps by the number of groups which
         # begin with dataset
