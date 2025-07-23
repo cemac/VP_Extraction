@@ -19,7 +19,7 @@ from pyart.io.common import make_time_unit_str, _test_arguments
 from pyart.core.radar import Radar
 from pyart.exceptions import MissingOptionalDependency
 
-from preprocessing import preprocessing,shift_ppi
+# from preprocessing import preprocessing,shift_ppi
 
 
 ODIM_H5_FIELD_NAMES = {
@@ -515,29 +515,29 @@ def return_names(radar, fields):
     return long_dictionary, short_dictionary
 
 
-def read_file(f, time, file_, log_file, fields,unit_dict=[],long_names=[], short_names=[], vp_mode='QVP', met_office=False, verbose=False):
+# def read_file(f, time, file_, log_file, fields,unit_dict=[],long_names=[], short_names=[], vp_mode='QVP', met_office=False, verbose=False):
 
-    if ".RAW" in file_:
-        radar = read_sigmet(file_)
-        radar = named_fields(radar)
-    elif ".h5" in file_:
-        data_type='lp'
-        radar = read_nimrod_aggregated_odim_h5(file_,data_type,time, log_file)
-        radar = named_fields(radar)
-    else:
-        radar = read(file_)
+#     if ".RAW" in file_:
+#         radar = read_sigmet(file_)
+#         radar = named_fields(radar)
+#     elif ".h5" in file_:
+#         data_type='lp'
+#         radar = read_nimrod_aggregated_odim_h5(file_,data_type,time, log_file)
+#         radar = named_fields(radar)
+#     else:
+#         radar = read(file_)
 
-    if f == 0:
-        unit_dict = return_units(radar, fields)
-        long_names, short_names = return_names(radar, fields)
+#     if f == 0:
+#         unit_dict = return_units(radar, fields)
+#         long_names, short_names = return_names(radar, fields)
 
-    try:
-        if (verbose): print ("preprocessing is running")
-        preprocessing(radar, vp_mode)
-        if not vp_mode=='QVP': shift_ppi(radar,fields)
-    except:
-        print('Preprocessing failed for', file_)
+#     try:
+#         if (verbose): print ("preprocessing is running")
+# #        preprocessing(radar, vp_mode)
+#         if not vp_mode=='QVP': shift_ppi(radar,fields)
+#     except:
+#         print('Preprocessing failed for', file_)
 
-    return (radar, unit_dict, long_names, short_names)
+#     return (radar, unit_dict, long_names, short_names)
 
 

@@ -1,4 +1,4 @@
-from vp import *
+from .vp import VerticalProfile
 from netCDF4 import Dataset, date2num, num2date
     
 def read_vertical_profile(vp_pathname):
@@ -52,7 +52,7 @@ def read_vertical_profile(vp_pathname):
                 elif attrname=='units':
                     units[field]=this_attr
                 else:
-                    print('unexpected attribute', attr, 'in group', field)
+                    print('unexpected attribute', attrname, 'in group', field)
             for dat in var_data.variables:
                 if dat=='Means':
                     means[field]=var_data.variables[dat][:]

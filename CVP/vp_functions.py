@@ -9,7 +9,7 @@ import math
 import datetime as dt
 from scipy import stats
 
-from vp import *
+from .vp import VerticalProfile
 
 
 def field_fill_to_nan(radar, mask_field):
@@ -373,7 +373,7 @@ def generate_cartesian_column_mask_from_lat_lon(radar, target_longitude, target_
     
     return column_mask
     
-def find_azimuth_mask(radar, target_azimuth, azi_step):
+def _find_azimuth_mask(radar, target_azimuth, azi_step):
     """
     Return a 2D boolean mask containing radar azimuths within a given window (+/- the azimuth step) centred
     on the target azimuth.
@@ -395,7 +395,7 @@ def find_azimuth_mask(radar, target_azimuth, azi_step):
     azi_mask = np.repeat(azi_mask,radar.ngates).reshape(radar.nrays,radar.ngates)
     return(azi_mask)
 
-def find_range_mask(radar, target_range, range_step):
+def _find_range_mask(radar, target_range, range_step):
 
     horizontal_ranges = np.sqrt(radar.gate_x['data']**2 + radar.gate_y['data']**2)
     range_mask = np.logical_and(horizontal_ranges>=target_range-range_step,
@@ -411,8 +411,8 @@ def generate_polar_column_mask(radar, target_azimuth, target_range, azimuth_size
     which means rectangular columns could be extracted if desired.
     """
 
-    azimuth_mask = find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
-    range_mask = find_range_mask(radar, target_range, range_size/2.0)
+    azimuth_mask = _find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
+    range_mask = _find_range_mask(radar, target_range, range_size/2.0)
     column_mask = np.all([azimuth_mask,
                           range_mask],
                         axis=0)
