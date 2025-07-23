@@ -5,7 +5,6 @@
 import numpy as np
 import pyart
 from netCDF4 import num2date
-import kdp_functions as kdpfun
 import math
 import datetime as dt
 from scipy import stats
@@ -58,127 +57,6 @@ def get_centre_lat_lon_for_radar(radar):
     centre_lon=np.mean(lon_data[:,:,0])
 
     return centre_lat, centre_lon
-
-'''
-def savitzky_golay(y, window_size, order, deriv=0, rate=1):
-    r"""Smooth (and optionally differentiate) data with a Savitzky-Golay filter.
-    The Savitzky-Golay filter removes high frequency noise from data.
-    It has the advantage of preserving the original shape and
-    features of the signal better than other types of filtering
-    approaches, such as moving averages techniques.
-    Parameters
-    ----------
-    y : array_like, shape (N,)
-        the values of the time history of the signal.
-    window_size : int
-        the length of the window. Must be an odd integer number.
-    order : int
-        the order of the polynomial used in the filtering.
-        Must be less then `window_size` - 1.
-    deriv: int
-        the order of the derivative to compute (default = 0 means only smoothing)
-    Returns
-    -------
-    ys : ndarray, shape (N)
-        the smoothed signal (or it's n-th derivative).
-    Notes
-    -----
-    The Savitzky-Golay is a type of low-pass filter, particularly
-    suited for smoothing noisy data. The main idea behind this
-    approach is to make for each point a least-square fit with a
-    polynomial of high order over a odd-sized window centered at
-    the point.
-    Examples
-    --------
-    t = np.linspace(-4, 4, 500)
-    y = np.exp( -t**2 ) + np.random.normal(0, 0.05, t.shape)
-    ysg = savitzky_golay(y, window_size=31, order=4)
-    import matplotlib.pyplot as plt
-    plt.plot(t, y, label='Noisy signal')
-    plt.plot(t, np.exp(-t**2), 'k', lw=1.5, label='Original signal')
-    plt.plot(t, ysg, 'r', label='Filtered signal')
-    plt.legend()
-    plt.show()
-    References
-    ----------
-    .. [1] A. Savitzky, M. J. E. Golay, Smoothing and Differentiation of
-       Data by Simplified Least Squares Procedures. Analytical
-       Chemistry, 1964, 36 (8), pp 1627-1639.
-    .. [2] Numerical Recipes 3rd Edition: The Art of Scientific Computing
-       W.H. Press, S.A. Teukolsky, W.T. Vetterling, B.P. Flannery
-       Cambridge University Press ISBN-13: 9780521880688
-    """
-    import numpy as np
-    from math import factorial
-
-    try:
-        window_size = np.abs(np.int(window_size))
-        order = np.abs(np.int(order))
-    except (ValueError):
-        raise ValueError("window_size and order have to be of type int")
-    if window_size % 2 != 1 or window_size < 1:
-        raise TypeError("window_size size must be a positive odd number")
-    if window_size < order + 2:
-        raise TypeError("window_size is too small for the polynomials order")
-    order_range = range(order+1)
-    half_window = (window_size -1) // 2
-    # precompute coefficients
-    b = np.mat([[k**i for i in order_range] for k in range(-half_window, half_window+1)])
-    m = np.linalg.pinv(b).A[deriv] * rate**deriv * factorial(deriv)
-    # pad the signal at the extremes with
-    # values taken from the signal itself
-    firstvals = y[0] - np.abs( y[1:half_window+1][::-1] - y[0] )
-    lastvals = y[-1] + np.abs(y[-half_window-1:-1][::-1] - y[-1])
-    y = np.concatenate((firstvals, y, lastvals))
-    return np.convolve( m[::-1], y, mode='valid')
-'''
-
-def smooth(x,window_len=11,window='hanning'):
-    """smooth the data using a window with requested size.
-
-    This method is based on the convolution of a scaled window with the signal.
-
-
-    input:
-        x: the input signal
-        window_len: the dimension of the smoothing window; should be an odd integer
-        window: the type of window from 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'
-            flat window will produce a moving average smoothing.
-
-    output:
-        the smoothed signal
-
-    example:
-
-    t=linspace(-2,2,0.1)
-    x=sin(t)+randn(len(t))*0.1
-    y=smooth(x)
-
-    see also:
-
-    numpy.hanning, numpy.hamming, numpy.bartlett, numpy.blackman, numpy.convolve
-    scipy.signal.lfilter
-
-    TODO: the window parameter could be the window itself if an array instead of a string
-    NOTE: length(output) != length(input), to correct this: return y[(window_len/2-1):-(window_len/2)] instead of just y.
-    """
-
-    if x.ndim != 1:
-        raise ValueError("smooth only accepts 1 dimension arrays.")
-
-    if x.size < window_len:
-        raise ValueError("Input vector needs to be bigger than window size.")
-
-    if window_len<3:
-        return x
-
-    if not window in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
-
-    box = np.ones(window_len)/window_len
-    y = np.convolve(x, box, mode='same')
-    y[0] = x[0]# to remove jumps at the lowest elevation
-    return y
 
 
 #----------------------------------------------------------------------------
@@ -456,5 +334,116 @@ def time_height_cvp(radar, vp, col_radius, field_list, tix,
         altitude_parameter_averaging_cvp(radar, vp, field, tix, timeofsweep,
                                          rixs, azixs, all_bin_indexes,
                                          azimuth_exclude = azimuth_exclude)
+        
+# ===========================================================================================================
+# CODE FOR LOCATING COLUMNS - 2D masks returned - column_mask
+# Current implementation - rectangular cartesian column
+#                        - rectangular cartesian column from lat/lon
+#                        - polar column (degrees in azi, metres in range) from an azi, horizontal range
+#                        - polar column from lat/lon
+#                        -
+# TO ADD IN FUTURE - Cylindrical columns using a radius
+# ===========================================================================================================
 
+def generate_cartesian_column_mask(radar, target_x_position, target_y_position, x_size, y_size):
+    """
+    Return a 2D boolean mask that matches the dimensions of the radar data (nrays,ngates).
+    The column will be centred on the target position with the x and y size being independently specified,
+    which means rectangular columns could be extracted if desired.
+    """
+    column_mask = np.all([radar.gate_x['data']>target_x_position-x_size/2.0,
+                                radar.gate_x['data']<target_x_position+x_size/2.0,
+                                radar.gate_y['data']>target_y_position-y_size/2.0,
+                                radar.gate_y['data']<target_y_position+y_size/2.0,
+                                ],
+                        axis=0)
+    return column_mask
 
+def generate_cartesian_column_mask_from_lat_lon(radar, target_longitude, target_latitude, x_size, y_size):
+    """
+    Return a 2D boolean mask that matches the dimensions of the radar data (nrays,ngates).
+    The column will be centred on the target latitude and longitude with the x and y size being independently specified in cartesian units.
+    """
+    x,y = pyart.core.geographic_to_cartesian_aeqd(lon=target_longitude,lat=target_latitude,
+                                        lon_0=radar.longitude['data'][0],
+                                        lat_0=radar.latitude['data'][0],
+                                       )
+    
+    column_mask = generate_cartesian_column_mask(radar, x, y, x_size, y_size)
+    
+    return column_mask
+    
+def find_azimuth_mask(radar, target_azimuth, azi_step):
+    """
+    Return a 2D boolean mask containing radar azimuths within a given window (+/- the azimuth step) centred
+    on the target azimuth.
+    The mask will cover all sweeps within the radar object.    
+    """
+    azimuths = radar.azimuth['data']
+    
+    if target_azimuth+azi_step >=360.0:
+        azi_mask = np.logical_or(azimuths>=target_azimuth-azi_step, 
+                                 azimuths<=target_azimuth+azi_step-360)
+    elif target_azimuth-azi_step < 0:
+        azi_mask = np.logical_or(azimuths>=360+target_azimuth-azi_step,
+                                 azimuths<=target_azimuth+azi_step)
+    
+    else:
+        azi_mask = np.logical_and(azimuths>=target_azimuth-azi_step,
+                                  azimuths<=target_azimuth+azi_step)
+
+    azi_mask = np.repeat(azi_mask,radar.ngates).reshape(radar.nrays,radar.ngates)
+    return(azi_mask)
+
+def find_range_mask(radar, target_range, range_step):
+
+    horizontal_ranges = np.sqrt(radar.gate_x['data']**2 + radar.gate_y['data']**2)
+    range_mask = np.logical_and(horizontal_ranges>=target_range-range_step,
+                                horizontal_ranges<=target_range+range_step,
+                                )
+    
+    return range_mask
+
+def generate_polar_column_mask(radar, target_azimuth, target_range, azimuth_size, range_size):
+    """
+    Return a 2D boolean mask that matches the dimensions of the radar data (nrays,ngates).
+    The column will be centred on the target azimuth and range with the azimuth and range size being independently specified (in degrees and metres),
+    which means rectangular columns could be extracted if desired.
+    """
+
+    azimuth_mask = find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
+    range_mask = find_range_mask(radar, target_range, range_size/2.0)
+    column_mask = np.all([azimuth_mask,
+                          range_mask],
+                        axis=0)
+    return column_mask
+
+def generate_polar_column_mask_from_lat_lon(radar, target_longitude, target_latitude, azimuth_size, range_size):
+    """
+    Return a 2D boolean mask that matches the dimensions of the radar data (nrays,ngates).
+    The column will be centred on the target latitude and longitude with the azimuth and range size being independently specified (in degrees and metres),
+    which means rectangular columns could be extracted if desired.
+    """
+    target_azimuth = pyart.util.for_azimuth(radar.latitude['data'],
+                                              target_latitude,
+                                              radar.longitude['data'],
+                                              target_longitude)
+    target_range = pyart.util.sphere_distance(radar.latitude['data'],
+                                              target_latitude,
+                                              radar.longitude['data'],
+                                              target_longitude)
+    azimuth_mask = find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
+    range_mask = find_range_mask(radar, target_range, range_size/2.0)
+    column_mask = np.all([azimuth_mask,
+                          range_mask],
+                        axis=0)
+    return column_mask
+
+def combine_column_mask_and_gatefilter(column_mask, gatefilter):
+    """
+    Combine a CVP column mask with a pyart gatefilter object to apply filtering to the CVP column without 
+    editing the underlying data within the radar object.
+    """
+    filtered_column_mask = np.logical_and(column_mask,
+                                          gatefilter.gate_included)
+    return filtered_column_mask
