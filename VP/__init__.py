@@ -1,5 +1,5 @@
 # ===============================================
-# NCAS/CEMAC CVP library
+# NCAS/CEMAC VP library
 # Generic code for production of CVPs (and QVPs)
 # Built on pyart
 # ===============================================

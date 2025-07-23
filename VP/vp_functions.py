@@ -130,7 +130,16 @@ def get_r_indexes(centre_rix, radar, col_radius, verbose = True):
 #                                                               for this column for this time
 #    azimuth_exclude - this currently does not do anything with azimuth exclude
 #----------------------------------------------------------------------------
-def altitude_parameter_averaging_cvp(radar, vp, field, tix, timeofsweep, rixs, azixs, all_bin_indexes, azimuth_exclude = None):
+def altitude_parameter_averaging_cvp(radar,
+                                     vp,
+                                     field,
+                                     tix,
+                                     timeofsweep,
+                                     rixs,
+                                     azixs,
+                                     all_bin_indexes, 
+                                     azimuth_exclude = None,
+                                     logarithmic_field=False):
 
     field_fill_to_nan(radar, field)
     nazimuths=int(radar.nrays/radar.nsweeps)
@@ -139,23 +148,8 @@ def altitude_parameter_averaging_cvp(radar, vp, field, tix, timeofsweep, rixs, a
     column = data[np.ix_(range(0,radar.nsweeps),azixs,rixs)]
 
 
-    if field in ['dBuZ', 'dBZ', 'dBZ_ac', 'dBuZv', 'dBZv']:column = np.power(10, column / 10.0)
-
-    # unfold uPhiDP values
-    # remove phi_dp wrap-around:
-    #print 'unwrapping phidp ...'
-    if field in ['uPhiDP']:
-        elev = column.shape[0]
-        rays = column.shape[1]
-        bins = column.shape[2]
-        METEO_THRESH=0.7
-        flags = np.zeros((elev, rays, bins))
-        # generate non-meteo mask:
-        rhohv_data = radar.fields['RhoHV']['data']
-        rhohv_3D_data = rhohv_data.reshape((radar.nsweeps,nazimuths,radar.ngates))
-        rhohv = rhohv_3D_data[np.ix_(range(0,radar.nsweeps),azixs,rixs)]
-        (meteoMask) = kdpfun.generate_meteo_mask(elev, rays, bins, flags, rhohv, METEO_THRESH)
-        column = kdpfun.unwrap_phidp(elev, rays, bins, meteoMask, column)
+    if logarithmic_field:
+        column = np.power(10, column / 10.0)
 
     # get mean of means for equidistant
     equdist_mean = np.zeros(vp.heights.shape[0])*np.nan
@@ -173,12 +167,7 @@ def altitude_parameter_averaging_cvp(radar, vp, field, tix, timeofsweep, rixs, a
                 equdist_count[h] = len(ix[0])
                 equdist_total[h] = len(temp_column)
 
-    if len(vp.heights) >= 300: win = 5
-    else:win = 3
-
-    equdist_mean = smooth(equdist_mean,win)
-
-    if field in ['dBuZ', 'dBZ', 'dBZ_ac', 'dBuZv', 'dBZv']:
+    if logarithmic_field:
         equdist_mean = 10 * np.log10(equdist_mean)
         equdist_std = 10 * np.log10(equdist_std)
 
@@ -201,7 +190,9 @@ def altitude_parameter_averaging_cvp(radar, vp, field, tix, timeofsweep, rixs, a
 
 
 def altitude_parameter_averaging_qvp(radar, vp, elev_ix, field, tix, timeofsweep, azimuth_mask,
-                                     meteoMask=[], snrMask=[], verbose=False):
+                                     meteoMask=[], snrMask=[],
+                                     logarithmic_field=False,
+                                     verbose=False):
 
     field_fill_to_nan(radar, field)
     nazimuths=int(radar.nrays/radar.nsweeps)
@@ -210,15 +201,8 @@ def altitude_parameter_averaging_qvp(radar, vp, elev_ix, field, tix, timeofsweep
     if len(meteoMask)>0:
         sweep_data[(meteoMask != 1) | (snrMask != 1)] = np.nan
 
-    # unfold uPhiDP values
-    # remove phi_dp wrap-around:
-    if field in ['uPhiDP']:
-        sweep_data = kdpfun.unwrap_phidp(1, nazimuths, radar.ngates, meteoMask, sweep_data)
-    elif field in ['ZDR'] and len(meteoMask)>0:
-        sweep_data[(sweep_data < -1.5) | (sweep_data > 5)] = np.nan
-    elif field in ['dBuZ', 'dBZ', 'dBuZv', 'dBZv']:
-        if len(meteoMask)>0:
-            sweep_data[(sweep_data < -10) | (sweep_data > 60)] = np.nan
+    
+    if logarithmic_field:
         sweep_data = np.power(10, sweep_data / 10.0)
 
     sweep_data = np.ma.masked_where(azimuth_mask,sweep_data)
@@ -226,7 +210,7 @@ def altitude_parameter_averaging_qvp(radar, vp, elev_ix, field, tix, timeofsweep
     mean_values=np.nanmean(sweep_data, axis=1)[0,:]
     std_values=np.nanstd(sweep_data, axis=1)[0,:]
     counts=np.sum(np.isfinite(sweep_data), axis=1).data[0,:]
-    if field in ['dBuZ', 'dBZ', 'dBuZv', 'dBZv']:
+    if logarithmic_field:
         mean_values = 10 * np.log10(mean_values)
         std_values = 10 * np.log10(std_values)
 
@@ -243,7 +227,8 @@ def altitude_parameter_averaging_qvp(radar, vp, elev_ix, field, tix, timeofsweep
 
 def time_height_qvp(radar, vp, field_list, tix,
                     elevation, azimuth_exclude = [],
-                    meteo=False,
+                    meteoMask=None,
+                    snrMask=None,
                     verbose=False):
 
     timeofsweep = num2date(np.nanmean(radar.time['data'][:]),
@@ -264,20 +249,6 @@ def time_height_qvp(radar, vp, field_list, tix,
     inv_mask = np.where(azimuth_mask, 0, 1)
     max_counts=np.sum(inv_mask, axis=1)
     vp.max_counts[:, tix]=max_counts
-    
-    if meteo:
-        flags = np.zeros((radar.nsweeps,nazimuths,radar.ngates))
-        rhohv = radar.fields['RhoHV']['data'].reshape((radar.nsweeps,nazimuths,radar.ngates))[elev_ix,:,:]
-        METEO_THRESH=0.7
-        (meteoMask) = kdpfun.generate_meteo_mask(1,nazimuths,radar.ngates, flags, rhohv, METEO_THRESH)
-
-        snrH = radar.fields['SNR']['data'].reshape(radar.nsweeps,nazimuths,radar.ngates)[elev_ix,:,:]
-        snrV = radar.fields['SNRv']['data'].reshape(radar.nsweeps,nazimuths,radar.ngates)[elev_ix,:,:]
-        snrMask = np.full_like(meteoMask,0)
-        snrMask[(snrH > 8) & (snrV > 8)] = 1
-    else:
-        meteoMask=[]
-        snrMask=[]
     
     for field in field_list:
         altitude_parameter_averaging_qvp(radar, vp, elev_ix, field, tix, timeofsweep,
@@ -432,8 +403,8 @@ def generate_polar_column_mask_from_lat_lon(radar, target_longitude, target_lati
                                               target_latitude,
                                               radar.longitude['data'],
                                               target_longitude)
-    azimuth_mask = find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
-    range_mask = find_range_mask(radar, target_range, range_size/2.0)
+    azimuth_mask = _find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
+    range_mask = _find_range_mask(radar, target_range, range_size/2.0)
     column_mask = np.all([azimuth_mask,
                           range_mask],
                         axis=0)

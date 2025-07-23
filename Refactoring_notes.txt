@@ -1,0 +1,22 @@
+VP refactoring summer 2025.
+
+Main principles:
+VP folder/module - generic code useful for anyone making CVPs and QVPs
+    The building blocks for more specific use cases
+    Should not include field names, specific processing for fields, hard-coded locations etc
+    Will need lots of changes to get there, for now aux_io contains a lot of hardcoded UKMO stuff for reading those files, this should move in future (maybe now, to own folder)
+
+    First task - remove fields and processing from vp_functions.py
+
+workflow_scripts - Use the CVP building blocks to build specific processing for DRUID data (or other examples)
+    Scripts should still not rely on hardcoded paths - use input arguments and config files to define everything needed
+    Aim is they could run anywhere subject to data being available and passed to the scripts
+    Expectation is that they are python scripts
+
+automation_scripts - Where actual file paths get coded, scripts for running SLURM jobs etc
+    Mix of shell scripts or python scripts that automate running
+    Would call workflow_scripts using file paths
+    Could separate these from the repo to a second repo that's not widely shared
+
+config - Example config files (for our use cases)
+    Again these could live with the automation_scripts, as they will be specific to us except for generic examples.
