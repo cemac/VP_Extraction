@@ -6,7 +6,10 @@ VP folder/module - generic code useful for anyone making CVPs and QVPs
     Should not include field names, specific processing for fields, hard-coded locations etc
     Will need lots of changes to get there, for now aux_io contains a lot of hardcoded UKMO stuff for reading those files, this should move in future (maybe now, to own folder)
 
-    First task - remove fields and processing from vp_functions.py
+    First task - remove fields and processing from vp_functions.py - Done 23/07 I think
+    Next task - rewrite VP extractions to use a 2D mask rather than 3D objects (the radar doesn't need reshaping all the time)
+              - Implemented some basic steps for this, including a direct addition to the VP object based on its attributes etc
+
 
 workflow_scripts - Use the CVP building blocks to build specific processing for DRUID data (or other examples)
     Scripts should still not rely on hardcoded paths - use input arguments and config files to define everything needed

@@ -31,10 +31,11 @@ import itertools
 import numpy as np
 from dateutil.parser import parse as dateparse
 import h5py as h5
+from netCDF4 import num2date
 
-import vp_functions
-import vp_io
-from vp import *
+from ..VP import vp_functions
+from ..VP.aux_io import vp_io
+from ..VP.vp import VerticalProfile
 import read_config
 import vp_grid_functions
 import pdb

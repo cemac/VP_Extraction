@@ -13,7 +13,7 @@ import datetime as dt
 
 #class to hold data in one VP file
 class VerticalProfile():
-    def __init__(self, ntimes, heights, field_list, long_names, short_names, units, global_attrs, output_file):
+    def __init__(self, target_latitude, target_longitude, ntimes, heights, field_list, long_names, short_names, units, global_attrs, output_file):
         self.times=[dt.datetime(1900,1,1)]*ntimes  # these will be stored as datetimes
         self.heights=heights
         self.output_file=output_file
@@ -25,7 +25,10 @@ class VerticalProfile():
         self.units={}
         self.lons=np.zeros(ntimes)
         self.lats=np.zeros(ntimes)
+        self.longitude={'data': target_longitude}
+        self.latitude={'data': target_latitude}     
         self.global_attrs=global_attrs
+        self.logarithmic_fields=[]
         nheights=len(heights)
         for field in field_list:
             self.means[field]=np.zeros((nheights, ntimes))*np.nan             
@@ -42,6 +45,13 @@ class VerticalProfile():
     def set_lat_lon_and_bounds(self, centre_lat_lon, lat_lon_bounds):
         self.centre_lat_lon=centre_lat_lon
         self.lat_lon_bounds=lat_lon_bounds
+
+    def set_column_parameters(self, column_type, params_dict):
+        self.column_type = column_type
+        self.column_parameters = params_dict
+
+    def set_logarithmic_fields(self, log_field_list):
+        self.logarithmic_fields = log_field_list
         
     def add_data_for_time(self, field, tix, timeofsweep, mean_values, std_values, counts, lon, lat):
         self.means[field][:,tix]=mean_values           

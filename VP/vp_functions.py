@@ -1,4 +1,4 @@
-# CVP functional code
+# VP functional code
 # Used to extract CVP data from cf-radial files using Pyart
 # Adpated by R. Neely March 2022
 
@@ -418,3 +418,153 @@ def combine_column_mask_and_gatefilter(column_mask, gatefilter):
     filtered_column_mask = np.logical_and(column_mask,
                                           gatefilter.gate_included)
     return filtered_column_mask
+
+
+# ===========================================================================================================
+# CODE FOR USING 2D COLUMN MASKS
+# Don't scale well, as a column is fixed looping fields through heights doesn't make sense
+# But having a function to extract one field may be useful, although is that just achieved by using a single field in a list?
+# 
+# Current implementation - column_field_height_average (Extract one field as a VP of mean, std and count)
+#                        - column_fields_height_averages (Extract a list of fields to dictionaries)
+# TO ADD IN FUTURE - 
+# ===========================================================================================================
+
+def column_field_height_average(radar, field, column_mask, lower_height_bounds, upper_height_bounds, logarithmic_field=False):
+
+    if logarithmic_field:
+        field_data = np.power(10,radar.fields[field]['data']/10)
+    else:
+        field_data = radar.fields[field]['data']
+    
+    column_altitudes = radar.gate_altitude['data'][column_mask]
+            
+    # Build Vertical Profile
+    
+    VP_mean = np.zeros(lower_height_bounds.shape[0])*np.nan
+    VP_std = np.zeros(lower_height_bounds.shape[0])*np.nan
+    VP_count = np.zeros(lower_height_bounds.shape[0])
+
+    h_index = 0         
+    for h_base, h_top in zip(lower_height_bounds, upper_height_bounds):
+        valid_mask = np.logical_and(column_altitudes>=h_base,
+                                    column_altitudes<h_top)
+        # Only build profile if the height range has at least 1 valid points in it (based on column mask)
+        if column_altitudes[valid_mask].shape[0]>=1:
+            VP_mean[h_index] = np.average(field_data[column_mask][valid_mask])
+            VP_std[h_index] = np.std(field_data[column_mask][valid_mask])
+            VP_count[h_index] = column_altitudes[valid_mask].shape[0]
+        else:
+            VP_mean[h_index] = np.nan
+            VP_std[h_index] = np.nan
+            VP_count[h_index] = 0
+        h_index+=1
+
+    if logarithmic_field:
+        VP_mean = 10*np.log10(VP_mean)
+        VP_std = 10*np.log10(VP_std)
+
+    return VP_mean, VP_std, VP_count
+
+def column_fields_height_averages(radar, field_list, column_mask, lower_height_bounds, upper_height_bounds, logarithmic_field_list=[]):
+    
+    column_altitudes = radar.gate_altitude['data'][column_mask]
+            
+    # Build Vertical Profile Containers
+    VP_means = {} 
+    VP_stds = {} 
+    VP_counts = {}
+
+    for field in field_list:
+        VP_means.update({field: np.zeros(lower_height_bounds.shape[0])*np.nan})
+        VP_stds.update({field: np.zeros(lower_height_bounds.shape[0])*np.nan})
+        VP_counts.update({field: np.zeros(lower_height_bounds.shape[0])})
+        
+    h_index = 0         
+    for h_base, h_top in zip(lower_height_bounds, upper_height_bounds):
+        valid_mask = np.logical_and(column_altitudes>=h_base,
+                                    column_altitudes<h_top)
+        
+        for field in field_list:
+
+            if field in logarithmic_field_list:
+                field_data = np.power(10,radar.fields[field]['data']/10)
+            else:
+                field_data = radar.fields[field]['data']
+
+            # Only build profile if the height range has at least 1 valid point in it (based on column mask)
+            if column_altitudes[valid_mask].shape[0]>=1:
+                VP_means[field][h_index] = np.average(field_data[column_mask][valid_mask])
+                VP_stds[field][h_index] = np.std(field_data[column_mask][valid_mask])
+                VP_counts[field][h_index] = column_altitudes[valid_mask].shape[0]
+            else:
+                VP_means[field][h_index] = np.nan
+                VP_stds[field][h_index] = np.nan
+                VP_counts[field][h_index] = 0
+        h_index+=1
+
+    for field in logarithmic_field_list:
+        VP_means[field] = 10*np.log10(VP_means[field])
+        VP_stds[field] = 10*np.log10(VP_stds[field])
+
+    return VP_means, VP_stds, VP_counts
+
+def add_radar_to_VP(VP, radar, tix, gatefilter=None):
+    """ The VP object should contain all the information needed to add a radar object to the VP at the 
+    time index specified by tix
+    (getting this to work will probably need some modification of the VP class)
+    """
+
+    # Set timestamp of radar object based on mean of data in it
+    timeofsweep = num2date(np.nanmean(radar.time['data'][:]),
+                                      radar.time['units'],
+                                      radar.time['calendar'])
+
+    # Generate column mask for this VP and radar object
+    if VP.column_type == 'polar':
+        column_mask = generate_polar_column_mask_from_lat_lon(radar,
+                                                              VP.longitude['data'],
+                                                              VP.latitude['data'],
+                                                              VP.column_parameters['azimuth_size'],
+                                                              VP.column_parameters['range_size'])
+    elif VP.column_type == 'cartesian':
+        column_mask = generate_cartesian_column_mask_from_lat_lon(radar,
+                                                                  VP.longitude['data'],
+                                                                  VP.latitude['data'],
+                                                                  VP.column_parameters['x_size'],
+                                                                  VP.column_parameters['y_size'])
+        
+    elif VP.column_type == 'cylindrical':
+        # Need to add this functionality to this code
+        raise NotImplementedError
+    else:
+        raise NotImplementedError
+    
+    if gatefilter:
+        column_mask = combine_column_mask_and_gatefilter(column_mask, gatefilter)
+    
+    # Height bands (workaround for now)
+    lower_height_bounds = np.zeros(VP.heights.shape[0])
+    lower_height_bounds[1:] = VP.heights[1:]-(VP.heights[1:]-VP.heights[:-1])
+
+    upper_height_bounds = np.zeros(VP.heights.shape[0])
+    upper_height_bounds[:-1] = VP.heights[1:]-(VP.heights[1:]-VP.heights[:-1])
+    upper_height_bounds[-1] = VP.heights[-1]+np.nanmean(VP.heights[1:]-VP.heights[:-1])
+    
+    # Extract column profiles for all the fields
+    mean_values, std_values, counts = column_fields_height_averages(radar,
+                                                                    VP.means.keys(),
+                                                                    column_mask,
+                                                                    lower_height_bounds,
+                                                                    upper_height_bounds,
+                                                                    VP.logarithmic_fields)
+    
+
+    # Send data to the VP object
+    for field in VP.means.keys():
+        VP.add_data_for_time(field, tix, timeofsweep, 
+                             mean_values[field],
+                             std_values[field],
+                             counts[field],
+                             VP.longitude['data'],
+                             VP.latitude['data'])    
