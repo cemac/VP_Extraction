@@ -258,8 +258,7 @@ def main():
                                           radar.time['calendar'])
         if verbose:
             print('radar at lat lon', radar_lat, radar_lon)
-        nazimuths=int(radar.nrays/radar.nsweeps)
-
+        
         # Extract CVPS in a loop
 
         for gid, this_vp in enumerate(vps):
@@ -267,7 +266,7 @@ def main():
             if verbose:
                 print('extracting CVP grid', gid ,'for time', timeofsweep)
             
-            vp_functions.add_radar_to_VP(vp,
+            vp_functions.add_radar_to_VP(this_vp,
                                          radar,
                                          f)
             
