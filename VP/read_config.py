@@ -9,6 +9,8 @@ Author: Julia Crook Jun 2025
 
 """
 
+import configparser as ConfParse
+
 def read_config(cfg_file):
     config={}
     specific_cvps=[]
@@ -78,3 +80,53 @@ def read_config(cfg_file):
         print('Warning: invalid PROFILE_TYPE in config')
     return config
 
+
+def read_cvp_config(cfg_file):
+
+    config={}
+    required_keys=['LOG_OUTPUT', 'DATA_INPUT', 'DATA_OUTPUT', 'FIELD_LIST']
+    cvp_keys=['COL_RADIUS', 'MAX_RADIUS', 'MIN_H', 'MAX_H', 'H_STEP', 'CREATE_CVP_GRID', 'SPECIFIC_CVP']
+    
+    config_f = ConfParse.ConfigParser(interpolation=None)
+    config_f.optionxform = lambda option: option
+    config_f.read(cfg_file)
+
+    for key in config_f['FILE_IO']:
+        config.update({key: config_f['FILE_IO'][key]})
+    
+    for key in config_f['CVP_SETTINGS']:
+        config.update({key: config_f['CVP_SETTINGS'][key]})
+
+    config['FIELD_LIST'] = []
+    for key_ in config_f['FIELD_LIST']:
+        config['FIELD_LIST'].append(config_f['FIELD_LIST'][key_])
+
+    config.update({'params_dict': {}})
+    for key in config_f['CVP_parameters']:
+        config['params_dict'].update({key: config_f.getfloat('CVP_parameters', key)})
+
+    config['CREATE_CVP_GRID'] = config_f.getboolean('CVP_LOCATIONS','CREATE_CVP_GRID')
+
+    for key in ['MIN_H','MAX_H','H_STEP']:
+        config[key] = config_f.getint('CVP_SETTINGS',key)
+
+    for key in ['COL_RADIUS','MAX_RADIUS']:
+        config[key] = config_f.getfloat('CVP_SETTINGS',key)
+
+    config['SPECIFIC_CVP'] = []
+    for key_ in config_f['SPECIFIC_CVPS']:
+        loc_string = config_f['SPECIFIC_CVPS'][key_]
+        locs = loc_string.split(' ')
+        config['SPECIFIC_CVP'].append((float(locs[0]), float(locs[1]), locs[2]))
+
+    for key in required_keys:
+        if key not in config.keys():
+            print('Warning: missing required config', key)
+            
+    if config['PROFILE_TYPE']=='CVP':
+        for key in cvp_keys:
+            if key not in config.keys():
+                print('Warning: missing required CVP config', key)
+    else:
+        print('Warning: invalid PROFILE_TYPE in config')
+    return config

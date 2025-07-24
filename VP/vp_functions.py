@@ -3,7 +3,8 @@
 # Adpated by R. Neely March 2022
 
 import numpy as np
-import pyart
+from pyart.core import geographic_to_cartesian_aeqd
+from pyart.util import sphere_distance, for_azimuth
 from netCDF4 import num2date
 import math
 import datetime as dt
@@ -335,9 +336,10 @@ def generate_cartesian_column_mask_from_lat_lon(radar, target_longitude, target_
     Return a 2D boolean mask that matches the dimensions of the radar data (nrays,ngates).
     The column will be centred on the target latitude and longitude with the x and y size being independently specified in cartesian units.
     """
-    x,y = pyart.core.geographic_to_cartesian_aeqd(lon=target_longitude,lat=target_latitude,
-                                        lon_0=radar.longitude['data'][0],
-                                        lat_0=radar.latitude['data'][0],
+    x,y = geographic_to_cartesian_aeqd(lon=target_longitude,
+                                       lat=target_latitude,
+                                       lon_0=radar.longitude['data'][0],
+                                       lat_0=radar.latitude['data'][0],
                                        )
     
     column_mask = generate_cartesian_column_mask(radar, x, y, x_size, y_size)
@@ -395,14 +397,14 @@ def generate_polar_column_mask_from_lat_lon(radar, target_longitude, target_lati
     The column will be centred on the target latitude and longitude with the azimuth and range size being independently specified (in degrees and metres),
     which means rectangular columns could be extracted if desired.
     """
-    target_azimuth = pyart.util.for_azimuth(radar.latitude['data'],
-                                              target_latitude,
-                                              radar.longitude['data'],
-                                              target_longitude)
-    target_range = pyart.util.sphere_distance(radar.latitude['data'],
-                                              target_latitude,
-                                              radar.longitude['data'],
-                                              target_longitude)
+    target_azimuth = for_azimuth(radar.latitude['data'],
+                                 target_latitude,
+                                 radar.longitude['data'],
+                                 target_longitude)
+    target_range = sphere_distance(radar.latitude['data'],
+                                   target_latitude,
+                                   radar.longitude['data'],
+                                   target_longitude)
     azimuth_mask = _find_azimuth_mask(radar, target_azimuth, azimuth_size/2.0)
     range_mask = _find_range_mask(radar, target_range, range_size/2.0)
     column_mask = np.all([azimuth_mask,
@@ -543,7 +545,7 @@ def add_radar_to_VP(VP, radar, tix, gatefilter=None):
     if gatefilter:
         column_mask = combine_column_mask_and_gatefilter(column_mask, gatefilter)
     
-    # Height bands (workaround for now)
+    # Height bands (workaround for now - modify VP object to have this included)
     lower_height_bounds = np.zeros(VP.heights.shape[0])
     lower_height_bounds[1:] = VP.heights[1:]-(VP.heights[1:]-VP.heights[:-1])
 
@@ -567,4 +569,4 @@ def add_radar_to_VP(VP, radar, tix, gatefilter=None):
                              std_values[field],
                              counts[field],
                              VP.longitude['data'],
-                             VP.latitude['data'])    
+                             VP.latitude['data'])
