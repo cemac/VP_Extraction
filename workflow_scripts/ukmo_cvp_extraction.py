@@ -128,7 +128,6 @@ def main():
     #### Input management
 
     args = parse_args()
-    config_file=args.config_file
     config = read_config.read_cvp_config(args.config_file)
     # get the timestamp as a datetime
     timestamp=args.timestamp
@@ -242,6 +241,7 @@ def main():
             vps[-1].set_lat_lon_and_bounds(specific_cvp[:2], lat_lon_bounds)
             vps[-1].set_column_parameters(config['column_type'],
                                           config['params_dict'])
+            vps[-1].set_logarithmic_fields(config['logarithmic_fields_list'])
 
     # Loop through all timesteps (i.e. files)
 
