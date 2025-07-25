@@ -193,6 +193,7 @@ def main():
                       file_list[0], config['LOG_OUTPUT'], config['FIELD_LIST'], unit_dict,
                       long_names, short_names, met_office=met_office, verbose=verbose)
     
+    radar_lat, radar_lon = vp_functions.get_centre_lat_lon_for_radar(radar)
     grid_lat_lons, grid_bounds= vp_grid_functions.get_cvp_grid_lat_lons(radar_lat, radar_lon,
                                                                         config['COL_RADIUS'],config['MAX_RADIUS'])
     ngrids=grid_lat_lons.shape[0]
