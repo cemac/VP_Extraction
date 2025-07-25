@@ -519,11 +519,11 @@ def read_file(f, time, file_, log_file, fields,unit_dict=[],long_names=[], short
 
     if ".RAW" in file_:
         radar = read_sigmet(file_)
-        radar = named_fields(radar)
+ #       radar = named_fields(radar)
     elif ".h5" in file_:
         data_type='lp'
         radar = read_nimrod_aggregated_odim_h5(file_,data_type,time, log_file)
-        radar = named_fields(radar)
+ #       radar = named_fields(radar)
     else:
         radar = read(file_)
 

@@ -9,7 +9,9 @@ VP folder/module - generic code useful for anyone making CVPs and QVPs
     First task - remove fields and processing from vp_functions.py - Done 23/07 I think
     Next task - rewrite VP extractions to use a 2D mask rather than 3D objects (the radar doesn't need reshaping all the time)
               - Implemented some basic steps for this, including a direct addition to the VP object based on its attributes etc
-
+              - First implementation done. auxi_io/vp_io.py modified to remove renaming
+                of MO fields to match NXPol. More refactoring to follow.
+              - VerticalProfile needs modification to save additional attributes to nc files.
 
 workflow_scripts - Use the CVP building blocks to build specific processing for DRUID data (or other examples)
     Scripts should still not rely on hardcoded paths - use input arguments and config files to define everything needed

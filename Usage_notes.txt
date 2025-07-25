@@ -1,0 +1,2 @@
+2025-07-25 - First new workflow script working. For now have added a symbolic link to the VP folder in the conda env site-packages folder which will act as a workaround until an install script is written (also keeps install up-to-date with dev version).
+           - The prompt used to run the script from the workflow script directory was: python ukmo_cvp_extraction.py -r chenies -c ../config/chenies_cvp_new.cfg -v -t 20200101
