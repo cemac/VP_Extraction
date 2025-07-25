@@ -101,6 +101,10 @@ def read_cvp_config(cfg_file):
     for key_ in config_f['FIELD_LIST']:
         config['FIELD_LIST'].append(config_f['FIELD_LIST'][key_])
 
+    config['logarithmic_fields_list'] = []
+    for key_ in config_f['logarithmic_fields_list']:
+        config['logarithmic_fields_list'].append(config_f['logarithmic_fields_list'][key_])
+
     config.update({'params_dict': {}})
     for key in config_f['CVP_parameters']:
         config['params_dict'].update({key: config_f.getfloat('CVP_parameters', key)})

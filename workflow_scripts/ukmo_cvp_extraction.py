@@ -220,6 +220,7 @@ def main():
                 vps[-1].set_lat_lon_and_bounds(grid_lat_lons[gid,:], grid_bounds[gid,:,:])
                 vps[-1].set_column_parameters(config['column_type'],
                                               config['params_dict'])
+                vps[-1].set_logarithmic_fields(config['logarithmic_fields_list'])
         
         for item, specific_cvp in enumerate(config['SPECIFIC_CVP']):
             site_name='{}_{}'.format(args.radar_name, specific_cvp[2])
