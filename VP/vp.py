@@ -16,6 +16,8 @@ class VerticalProfile():
     def __init__(self, target_latitude, target_longitude, ntimes, heights, field_list, long_names, short_names, units, global_attrs, output_file):
         self.times=[dt.datetime(1900,1,1)]*ntimes  # these will be stored as datetimes
         self.heights=heights
+        self.nheights = len(heights)
+        self.ntimes = ntimes
         self.output_file=output_file
         self.means={}
         self.stddevs={}
@@ -29,18 +31,18 @@ class VerticalProfile():
         self.latitude={'data': target_latitude}     
         self.global_attrs=global_attrs
         self.logarithmic_fields=[]
-        nheights=len(heights)
+        
         for field in field_list:
-            self.means[field]=np.zeros((nheights, ntimes))*np.nan             
-            self.stddevs[field]=np.zeros((nheights, ntimes))*np.nan             
-            self.counts[field]=np.zeros((nheights, ntimes), int)
+            self.means[field]=np.zeros((self.nheights, self.ntimes))*np.nan             
+            self.stddevs[field]=np.zeros((self.nheights, self.ntimes))*np.nan             
+            self.counts[field]=np.zeros((self.nheights, self.ntimes), int)
             if field in units.keys():
                 self.long_names[field]=long_names[field]
                 self.standard_names[field]=short_names[field]
                 self.units[field]=units[field]
             else:
                 raise ValueError('VerticalProfile creation: units does not contain '+field)
-        self.max_counts=np.zeros((nheights, ntimes), int)
+        self.max_counts=np.zeros((self.nheights, self.ntimes), int)
 
     def set_lat_lon_and_bounds(self, centre_lat_lon, lat_lon_bounds):
         self.centre_lat_lon=centre_lat_lon
@@ -67,6 +69,14 @@ class VerticalProfile():
             return (self.means[field], self.stddevs[field], self.counts[field], self.long_names[field], self.standard_names[field], self.units[field])
         else:
             raise ValueError('no such field '+field)
+        
+    def add_new_field(self, field_name, field_long_name, field_short_name, field_units):
+        self.means[field_name]=np.zeros((self.nheights, self.ntimes))*np.nan             
+        self.stddevs[field_name]=np.zeros((self.nheights, self.ntimes))*np.nan             
+        self.counts[field_name]=np.zeros((self.nheights, self.ntimes), int)
+        self.long_names[field_name] = field_long_name
+        self.standard_names[field_name] = field_short_name
+        self.units[field_name] = field_units
         
     def print(self):
         deltat=self.times[1]-self.times[0]

@@ -102,55 +102,6 @@ def remove_nearest_bins(radar):
 		if (a_field != "scan_altitude"):
 			radar.fields[a_field]['data'][:,np.where(ranges<400)[0]] = np.nan
 
-#def attenuation_correction(radar):
-#	ALPHA = 0.27
-#	b = 0.78
-#	ZH_AH_DELTAPHI_THRESHOLD = 5
-#	AH_FIELD = "Specific_Attenuation_H"
-#	Z_IAH_FIELD = "dBZ_ac"
-#	ZDR_IAH_FIELD = "ZDR_ac"
-#	ZH_AH_FIELD = "Zh_Ah"
-#	REFL_METEO = "dBZ"
-#	ZDR_METEO = "ZDR"
-#	ZH_AH_THR_FIELD = "Zh_Ah_Threshold"
-#
-#	temperature = copy.deepcopy(radar.fields["temperature_2"]['data'])
-#	smooth_phi = copy.deepcopy(radar.fields["sPhiDP"]['data'])
-#	meteoMask = copy.deepcopy(radar.fields["meteoMask"]['data'])
-#
-#	attenuation_mask = np.where(np.logical_or(meteoMask,temperature<273.15),True,False)
-#
-#	Ah, delta_phi = nrt_attenuation.specific_attenuation_single_segment_ZPHI(radar,
-#                                                                            ALPHA,
-#                                                                            b,
-#                                                                            "sPhiDP",
-#                                                                            REFL_METEO,
-#                                                                            attenuation_mask,
-#                                                                            20, 20, 5, 500,
-#                                                                            0, 10, 5, 900)
-#
-#	delta_phi_array = np.repeat(delta_phi, radar.ngates).reshape(delta_phi.shape[0], radar.ngates)
-#
-#	radar.add_field_like('PhiDP', 'delta_phi', np.ma.masked_invalid(delta_phi_array))
-#	radar.add_field_like('dBuZ', AH_FIELD, np.ma.masked_invalid(Ah))
-#
-#   # Add attenuation correction to new reflectivity field
-#	Z_IAH = nrt_attenuation.correct_Zh_with_Ah(radar.fields[REFL_METEO]['data'],
-#                                               radar.fields[AH_FIELD]['data'],
-#                                               int(radar.range['meters_between_gates']) / 1000.0)
-#
-#	radar.add_field_like('dBuZ', Z_IAH_FIELD, Z_IAH)
-#
-#	ZDR_IAH = nrt_attenuation.correct_zdr_with_Ah(radar.fields[ZDR_METEO]['data'],
-#                                                  radar.fields[AH_FIELD]['data'],
-#                                                  int(radar.range['meters_between_gates']) / 1000.0,
-#                                                  0.14)
-#
-#	radar.add_field_like('ZDR', ZDR_IAH_FIELD, ZDR_IAH)
-#
-#	return radar
-
-
 def shift_ppi(radar, field_list):
 	the_list_of_elevations = np.unique(radar.elevation['data'])
 
@@ -200,3 +151,29 @@ def preprocessing(radar, vp_mode):
     psidp_field = 0.632 * (copy.deepcopy(radar.fields['ZDR']['data'])) ** 1.71
 
     radar.add_field_like('PhiDP', 'uPsiDP', psidp_field)
+
+def estimate_noise_level(radar, height_limit=17500, range_limit=50):
+    # Mask at the data fill level (MO files)
+    dBZ = np.ma.masked_less_equal(radar.fields['reflectivity']['data'],-32)
+    
+    # Mask high value echoes (unlikely to be noise)
+    dBZ_m = np.ma.masked_greater_equal(dBZ,30)
+    
+    # Define a noise location mask based on altitude and range (mainly height)
+    mask = np.logical_and(radar.gate_altitude['data']>height_limit,
+                          np.tile(radar.range['data'][:]/1000.0,radar.nrays).reshape(radar.nrays,radar.ngates)>range_limit)
+    
+    mask = np.logical_and(mask,
+                          ~dBZ_m.mask)
+        
+    # Remove range correction
+    dBZ_Plin = dBZ-20*np.log10(radar.range['data']/1000.0)
+    # Mask reflectivity with range correction removed
+    dBZ_Plin_M = np.where(mask, dBZ_Plin, np.nan)
+    noise_estimate = np.round(np.nanmean(np.nanmean(dBZ_Plin_M.data,axis=0)),2)
+
+    lin_noise_estimate = np.power(10,0.1*noise_estimate)
+    signal = np.power(10,0.1*dBZ_Plin)-lin_noise_estimate
+    
+    SNRH = 10*np.log10(signal)-(noise_estimate)
+    return(noise_estimate, SNRH)
